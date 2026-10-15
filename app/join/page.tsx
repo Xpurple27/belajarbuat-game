@@ -1,16 +1,20 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function JoinPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [roomCode, setRoomCode] = useState(searchParams.get("room") ?? "");
+  const [roomCode, setRoomCode] = useState("");
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("4");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const room = new URLSearchParams(window.location.search).get("room");
+    if (room) setRoomCode(room.replace(/\D/g, "").slice(0, 6));
+  }, []);
 
   async function joinRoom(event: FormEvent) {
     event.preventDefault();
