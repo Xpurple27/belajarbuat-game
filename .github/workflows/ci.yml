@@ -3,7 +3,7 @@ name: Math Arena CI
 on:
   push:
     branches:
-      - feat/math-arena-mvp
+      - feat/math-arena-complete
   pull_request:
     branches:
       - main
