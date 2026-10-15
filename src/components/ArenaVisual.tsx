@@ -39,7 +39,15 @@ export default function ArenaVisual({
           <div><span className="modeKicker">POWER DUEL</span><strong>Tug of War</strong></div>
           <RoundChip current={state.roundsPlayed} max={state.maxRounds} />
         </div>
-        <TugArena position={state.position} target={state.target} winner={state.winner} playerALabel={playerALabel} playerBLabel={playerBLabel} />
+        <TugArena
+          position={state.position}
+          target={state.target}
+          winner={state.winner}
+          playerALabel={playerALabel}
+          playerBLabel={playerBLabel}
+          playerACharacter={playerACharacter}
+          playerBCharacter={playerBCharacter}
+        />
         <div className="arenaScoreStrip">
           <span><strong>{playerALabel}</strong> · {state.totalPowerA} power</span>
           <strong>{state.complete ? winnerText(state.winner, playerALabel, playerBLabel) : `${state.position > 0 ? "+" : ""}${state.position}`}</strong>
