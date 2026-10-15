@@ -35,6 +35,19 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
       return NextResponse.json({ error: "Game sudah dimulai." }, { status: 409 });
     }
 
+    const { data: availableQuestion, error: questionCheckError } = await supabase
+      .from("arena_questions")
+      .select("id")
+      .eq("grade_level", gradeLevel)
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (questionCheckError) throw questionCheckError;
+    if (!availableQuestion) {
+      return NextResponse.json({ error: `Bank soal kelas ${gradeLevel} belum tersedia di Math Arena.` }, { status: 409 });
+    }
+
     const opponentMode = room.opponent_mode as OpponentMode;
     const aiDifficulty = room.ai_difficulty as AiDifficulty;
     const { data: existingPlayers, error: playersError } = await supabase
