@@ -85,3 +85,17 @@
   .namedLane{grid-template-columns:64px 1fr 40px !important}.laneName{font-size:9px;padding:0 4px}.kartHero{display:none}
   .explosionCinematic strong{margin-top:48px}.resultActions{display:grid;grid-template-columns:1fr;width:100%}
 }
+
+
+/* Premium UAT heroes: Kael + Mira */
+.premiumHeroImage{display:block;width:100%;height:auto;max-height:100%;object-fit:contain;object-position:center bottom;user-select:none;pointer-events:none;filter:drop-shadow(0 10px 4px rgba(0,0,0,.28))}
+.hero-kael .premiumHeroImage{filter:drop-shadow(0 10px 4px rgba(0,0,0,.28)) drop-shadow(0 0 12px rgba(54,226,239,.14))}
+.hero-mira .premiumHeroImage{filter:drop-shadow(0 10px 4px rgba(0,0,0,.28)) drop-shadow(0 0 12px rgba(255,105,150,.14))}
+.premiumSide-B{transform:scaleX(-1)}
+.characterPreview .premiumHero{width:78px;height:110px;display:grid;place-items:end center}
+.characterPreview .premiumHeroImage{width:auto;max-width:76px;max-height:108px}
+.kartHero .premiumHeroImage{width:auto;max-height:44px}
+.resultHeroPanel .premiumHeroImage,.resultAvatarPanel .premiumHeroImage{width:auto;max-width:min(230px,90%);max-height:270px}
+.tugArenaWrap{position:relative}.tugPremiumHero{position:absolute;z-index:3;bottom:25.5%;width:clamp(58px,8vw,105px);height:31%;object-fit:contain;object-position:center bottom;pointer-events:none;user-select:none;filter:drop-shadow(0 7px 3px rgba(0,0,0,.24));animation:heroPull .42s ease-in-out infinite alternate}
+.tugPremiumA{left:12.3%}.tugPremiumB{right:12.3%;transform:scaleX(-1)}
+@media(max-width:620px){.characterPicker{grid-template-columns:repeat(2,minmax(0,1fr))}.characterCard{grid-template-columns:62px 1fr;padding:10px}.characterCard strong{font-size:15px}.characterCard span{font-size:10px}.characterPreview{width:58px;height:88px}.characterPreview .premiumHero{width:56px;height:84px}.characterPreview .premiumHeroImage{max-width:55px;max-height:82px}.tugPremiumHero{width:clamp(48px,12vw,74px)}}

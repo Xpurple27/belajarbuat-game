@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ArenaVisual from "@/src/components/ArenaVisual";
 import CharacterPicker from "@/src/components/CharacterPicker";
-import type { HeroId } from "@/src/components/PixelAvatar";
+import { normalizeHeroId, type HeroId } from "@/src/components/PixelAvatar";
 import { supabase } from "@/src/lib/supabase";
 import { playSfx } from "@/src/lib/sfx";
 import {
@@ -96,7 +96,7 @@ export default function HostPage(){
     if(!response.ok)return;
     const data=await response.json();
     const next:Record<string,HeroId>={};
-    for(const item of data.characters??[])next[item.id]=item.characterId==="lyra"?"lyra":"nova";
+    for(const item of data.characters??[])next[item.id]=normalizeHeroId(item.characterId);
     setCharacters(next);
   },[]);
 
@@ -136,7 +136,7 @@ export default function HostPage(){
         setState(payload.state);setLastRound(payload.answers??null);setRoomStatus("paused");const side=hostPlayerRef.current?.side;if(side&&payload.answers?.[side]){const own=payload.answers[side];setHostFeedback(own.correct?`Benar! +${own.power} power`:"Belum tepat. Ronde selesai.")}
         if(soundOnRef.current){const game=payload.gameMode as GameMode;if(game==="tug-of-war")playSfx(payload.gameComplete?"win":"rope");else if(game==="racing")playSfx(payload.gameComplete?"win":"engine");else if(game==="boss-battle")playSfx(payload.gameComplete?(payload.state?.success?"win":"defeat"):"bossHit");else if(game==="bomb-defuse"&&payload.gameComplete){if(payload.state?.success)playSfx("win");else{playSfx("alarm");window.setTimeout(()=>{if(soundOnRef.current)playSfx("explosion")},520)}}}
       })
-      .on("broadcast",{event:"character-changed"},({payload})=>{if(payload.playerId)setCharacters(current=>({...current,[String(payload.playerId)]:payload.characterId==="lyra"?"lyra":"nova"}))})
+      .on("broadcast",{event:"character-changed"},({payload})=>{if(payload.playerId)setCharacters(current=>({...current,[String(payload.playerId)]:normalizeHeroId(payload.characterId)}))})
       .on("broadcast",{event:"game-changed"},({payload})=>{setCurrentGame(payload.gameMode);setState(payload.state);setRound(0);setLastRound(null);setHostQuestion(null);hostQuestionIdRef.current=null;hostStartedAtRef.current=0;setHostSubmitted(false);setHostFeedback("");setRoomStatus("paused")})
       .on("broadcast",{event:"session-finished"},()=>{setRoomStatus("finished");setHostQuestion(null);hostQuestionIdRef.current=null})
       .on("presence",{event:"sync"},()=>{const presence=channel.presenceState<Record<string,unknown>>();const ids=new Set<string>();Object.values(presence).flat().forEach(entry=>{if(entry.role==="player"&&entry.playerId)ids.add(String(entry.playerId))});setOnlineHumanIds(ids);setConnection("ONLINE")})

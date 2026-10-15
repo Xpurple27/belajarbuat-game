@@ -1,6 +1,10 @@
 "use client";
 
-export type HeroId = "nova" | "lyra";
+export type HeroId = "nova" | "lyra" | "kael" | "mira";
+export const HERO_IDS: HeroId[] = ["nova", "lyra", "kael", "mira"];
+export function normalizeHeroId(value: unknown, fallback: HeroId = "nova"): HeroId {
+  return typeof value === "string" && HERO_IDS.includes(value as HeroId) ? value as HeroId : fallback;
+}
 export type HeroState = "idle" | "think" | "correct" | "wrong" | "pull" | "run" | "attack" | "hurt" | "celebrate" | "lose";
 
 interface PixelAvatarProps {
@@ -39,6 +43,22 @@ export default function PixelAvatar({
   compact = false,
   characterId = side === "A" ? "nova" : "lyra",
 }: PixelAvatarProps) {
+  if (characterId === "kael" || characterId === "mira") {
+    const premiumSrc = characterId === "kael" ? "/heroes/kael.webp" : "/heroes/mira.webp";
+    const premiumName = characterId === "kael" ? "Kael" : "Mira";
+    return (
+      <div
+        className={`pixelAvatar hero-${characterId} premiumHero ${compact ? "compact" : ""} avatar-${state}`}
+        aria-label={`${label ?? premiumName} · ${state}`}
+        data-hero={characterId}
+        data-state={state}
+      >
+        <img className={`premiumHeroImage premiumSide-${side}`} src={premiumSrc} alt={label ?? premiumName} draggable={false} />
+        {label && <span>{label}</span>}
+      </div>
+    );
+  }
+
   const hero = HERO[characterId];
   const skin = "#f1bd91";
   const facing = side === "A" ? 1 : -1;

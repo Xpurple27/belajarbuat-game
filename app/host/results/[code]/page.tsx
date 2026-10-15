@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import PixelAvatar, { type HeroId } from "@/src/components/PixelAvatar";
+import PixelAvatar, { normalizeHeroId, type HeroId } from "@/src/components/PixelAvatar";
 
 type TopicStat={topic:string;attempts:number;correct:number;accuracy:number;avgResponseMs:number};
 type PlayerResult={id:string;displayName:string;gradeLevel:number;side:"A"|"B";totalQuestions:number;correct:number;accuracy:number;avgResponseMs:number;strongestTopic:string|null;needsPractice:string|null;topicStats:TopicStat[]};
@@ -17,7 +17,7 @@ export default function HostResultsPage(){
       const session=JSON.parse(raw) as {code:string;token:string};if(session.code!==code){router.replace("/host");return}
       void Promise.all([
         fetch(`/api/rooms/${code}/results`,{headers:{"x-host-token":session.token},cache:"no-store"}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error??"Gagal memuat hasil.");setResults(data.results??[])}),
-        fetch(`/api/rooms/${code}/character`,{cache:"no-store"}).then(async response=>{if(!response.ok)return;const data=await response.json();const next:Record<string,HeroId>={};for(const item of data.characters??[])next[item.id]=item.characterId==="lyra"?"lyra":"nova";setCharacters(next)}),
+        fetch(`/api/rooms/${code}/character`,{cache:"no-store"}).then(async response=>{if(!response.ok)return;const data=await response.json();const next:Record<string,HeroId>={};for(const item of data.characters??[])next[item.id]=normalizeHeroId(item.characterId);setCharacters(next)}),
       ]).catch(resultError=>setError(resultError instanceof Error?resultError.message:"Gagal memuat hasil.")).finally(()=>setLoading(false));
     }catch{router.replace("/host")}
   },[code,router]);

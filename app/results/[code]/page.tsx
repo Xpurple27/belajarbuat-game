@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import PixelAvatar, { type HeroId } from "@/src/components/PixelAvatar";
+import PixelAvatar, { normalizeHeroId, type HeroId } from "@/src/components/PixelAvatar";
 
 type TopicStat = { topic:string; attempts:number; correct:number; accuracy:number; avgResponseMs:number };
 type PlayerResult = {
@@ -26,7 +26,7 @@ export default function PlayerResultsPage() {
     if (!raw) { router.replace(`/join?room=${code}`); return; }
     try {
       const session = JSON.parse(raw) as PlayerSession;
-      if (session.characterId === "lyra") setHero("lyra");
+      setHero(normalizeHeroId(session.characterId));
       void Promise.all([
         fetch(`/api/rooms/${code}/results?playerId=${encodeURIComponent(session.id)}`, {
           headers: { "x-player-token": session.token }, cache:"no-store",
@@ -39,8 +39,7 @@ export default function PlayerResultsPage() {
           if (!response.ok) return;
           const data = await response.json();
           const own = (data.characters ?? []).find((item:{id:string;characterId:string}) => item.id === session.id);
-          if (own?.characterId === "lyra") setHero("lyra");
-          else if (own?.characterId === "nova") setHero("nova");
+          if (own?.characterId) setHero(normalizeHeroId(own.characterId));
         }),
       ]).catch(loadError => setError(loadError instanceof Error ? loadError.message : "Gagal memuat hasil."))
         .finally(() => setLoading(false));
