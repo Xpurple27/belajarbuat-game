@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./uat-v2.css";
 
 export const metadata: Metadata = {
   title: "LevelUP Math Arena",
@@ -8,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="id">
+    <html lang="id">">
       <body>{children}</body>
     </html>
   );
