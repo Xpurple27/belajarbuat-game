@@ -15,16 +15,22 @@ function RoundChip({ current, max }: { current: number; max: number }) {
   return <span className="roundChip">R{Math.min(current, max)}/{max}</span>;
 }
 
-function winnerText(winner: "A" | "B" | "draw" | null) {
-  if (winner === "draw") return "DRAW";
-  return winner ? `PLAYER ${winner} WINS` : "";
+function winnerText(
+  winner: "A" | "B" | "draw" | null,
+  playerALabel: string,
+  playerBLabel: string,
+) {
+  if (winner === "draw") return "HASIL SERI";
+  if (winner === "A") return `${playerALabel.toUpperCase()} MENANG!`;
+  if (winner === "B") return `${playerBLabel.toUpperCase()} MENANG!`;
+  return "";
 }
 
 export default function ArenaVisual({
   mode,
   state,
-  playerALabel = "Player A",
-  playerBLabel = "Player B",
+  playerALabel = "Player 1",
+  playerBLabel = "Player 2",
 }: ArenaVisualProps) {
   if (mode === "tug-of-war" && state.kind === "tug-of-war") {
     return (
@@ -33,11 +39,17 @@ export default function ArenaVisual({
           <div><span className="modeKicker">POWER DUEL</span><strong>Tug of War</strong></div>
           <RoundChip current={state.roundsPlayed} max={state.maxRounds} />
         </div>
-        <TugArena position={state.position} target={state.target} winner={state.winner} />
+        <TugArena
+          position={state.position}
+          target={state.target}
+          winner={state.winner}
+          playerALabel={playerALabel}
+          playerBLabel={playerBLabel}
+        />
         <div className="arenaScoreStrip">
-          <span><b>A</b> {playerALabel} · {state.totalPowerA} power</span>
-          <strong>{state.complete ? winnerText(state.winner) : `${state.position > 0 ? "+" : ""}${state.position}`}</strong>
-          <span>{state.totalPowerB} power · {playerBLabel} <b>B</b></span>
+          <span><strong>{playerALabel}</strong> · {state.totalPowerA} power</span>
+          <strong>{state.complete ? winnerText(state.winner, playerALabel, playerBLabel) : `${state.position > 0 ? "+" : ""}${state.position}`}</strong>
+          <span>{state.totalPowerB} power · <strong>{playerBLabel}</strong></span>
         </div>
       </div>
     );
@@ -54,8 +66,8 @@ export default function ArenaVisual({
         </div>
         <div className="raceScene">
           <div className="raceBackdrop"><i /><i /><i /></div>
-          <div className="raceLaneWrap">
-            <div className="laneLabel">A</div>
+          <div className="raceLaneWrap namedLane">
+            <div className="laneLabel laneName" title={playerALabel}>{playerALabel}</div>
             <div className="raceLane">
               <div className="finishLine" />
               <div className="pixelKart kartA" style={{ left: `calc(${a}% - ${a > 92 ? 54 : 28}px)` }}>
@@ -64,8 +76,8 @@ export default function ArenaVisual({
             </div>
             <span className="distanceTag">{state.distanceA}/{state.target}</span>
           </div>
-          <div className="raceLaneWrap">
-            <div className="laneLabel">B</div>
+          <div className="raceLaneWrap namedLane">
+            <div className="laneLabel laneName" title={playerBLabel}>{playerBLabel}</div>
             <div className="raceLane">
               <div className="finishLine" />
               <div className="pixelKart kartB" style={{ left: `calc(${b}% - ${b > 92 ? 54 : 28}px)` }}>
@@ -77,7 +89,7 @@ export default function ArenaVisual({
         </div>
         <div className="arenaScoreStrip">
           <span>{playerALabel}</span>
-          <strong>{state.complete ? winnerText(state.winner) : "FINISH LINE"}</strong>
+          <strong>{state.complete ? winnerText(state.winner, playerALabel, playerBLabel) : "FINISH LINE"}</strong>
           <span>{playerBLabel}</span>
         </div>
       </div>
@@ -86,6 +98,8 @@ export default function ArenaVisual({
 
   if (mode === "boss-battle" && state.kind === "boss-battle") {
     const hp = Math.max(0, (state.bossHp / state.maxBossHp) * 100);
+    const attacking = state.lastDamage > 0;
+    const completeLabel = state.success ? "TEAM MENANG · BOSS DIKALAHKAN" : "TEAM KALAH · BOSS BERTAHAN";
     return (
       <div className="arenaFrame bossWorld" aria-label="Boss Battle">
         <div className="arenaTitleRow">
@@ -97,19 +111,23 @@ export default function ArenaVisual({
           <div className="hpTrack"><div className="hpFill" style={{ width: `${hp}%` }} /></div>
           <span className="hpText">{state.bossHp}/{state.maxBossHp} HP</span>
         </div>
-        <div className="battleStage">
-          <PixelAvatar side="A" label={playerALabel} state={state.lastCombo ? "attack" : "idle"} />
-          <div className={state.lastDamage > 0 ? "bossMonster bossHit" : "bossMonster"}>
+        <div className={`battleStage ${attacking ? "battleImpact" : ""}`}>
+          <PixelAvatar side="A" label={playerALabel} state={attacking ? "attack" : state.complete && state.success ? "celebrate" : "idle"} />
+          <div className={attacking ? "bossMonster bossHit bossFlash" : "bossMonster"}>
             <div className="bossHorn left" /><div className="bossHorn right" />
             <div className="bossFace"><i className="bossEye left" /><i className="bossEye right" /><i className="bossMouth" /></div>
-            {state.lastDamage > 0 && <span className="damageBurst">-{state.lastDamage}</span>}
+            {attacking && <>
+              <span className="damageBurst">-{state.lastDamage}</span>
+              <span className="impactSlash slashOne" />
+              <span className="impactSlash slashTwo" />
+            </>}
           </div>
-          <PixelAvatar side="B" label={playerBLabel} state={state.lastCombo ? "attack" : "idle"} />
+          <PixelAvatar side="B" label={playerBLabel} state={attacking ? "attack" : state.complete && state.success ? "celebrate" : "idle"} />
         </div>
         <div className="arenaScoreStrip">
-          <span>A damage {state.totalDamageA}</span>
-          <strong>{state.complete ? (state.success ? "BOSS DEFEATED" : "BOSS SURVIVED") : state.lastCombo ? "COMBO ATTACK" : "ATTACK TOGETHER"}</strong>
-          <span>B damage {state.totalDamageB}</span>
+          <span>{playerALabel} · {state.totalDamageA} damage</span>
+          <strong>{state.complete ? completeLabel : state.lastCombo ? "⚡ COMBO ATTACK!" : attacking ? `💥 ${state.lastDamage} DAMAGE` : "SERANG BERSAMA"}</strong>
+          <span>{playerBLabel} · {state.totalDamageB} damage</span>
         </div>
       </div>
     );
