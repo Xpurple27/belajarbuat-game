@@ -1,0 +1,494 @@
+/* Math Arena Visual V3 — premium live game skin */
+
+:root {
+  --arena-blue: #28c6ff;
+  --arena-cyan: #4de7ff;
+  --arena-violet: #966dff;
+  --arena-pink: #ff65c8;
+  --arena-gold: #ffc857;
+  --arena-ink: #071126;
+  --arena-panel: rgba(8, 18, 43, .9);
+}
+
+/* ---------- Hero picker ---------- */
+.characterPicker {
+  gap: 16px !important;
+}
+.heroChoice {
+  position: relative;
+  min-height: 180px !important;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid rgba(115, 151, 220, .36) !important;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(77, 231, 255, .1), transparent 34%),
+    linear-gradient(145deg, rgba(18, 34, 72, .98), rgba(7, 15, 36, .98)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 16px 34px rgba(0,0,0,.2);
+  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.heroChoice:hover {
+  transform: translateY(-3px);
+  border-color: rgba(100, 214, 255, .7) !important;
+  box-shadow: 0 18px 42px rgba(9, 22, 59, .5), 0 0 26px rgba(55, 201, 255, .12);
+}
+.heroChoice.active {
+  border-color: #9d85ff !important;
+  box-shadow: 0 0 0 1px rgba(157,133,255,.48), 0 18px 45px rgba(64,40,155,.34), inset 0 0 34px rgba(124,98,255,.1) !important;
+}
+.heroChoice::after {
+  content: "";
+  position: absolute;
+  width: 170px;
+  height: 170px;
+  right: -75px;
+  bottom: -95px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--hero-accent, #7c62ff) 26%, transparent), transparent 68%);
+  z-index: -1;
+}
+.heroChoice .pixelAvatar {
+  width: 118px !important;
+  height: 156px;
+  align-self: end;
+  filter: drop-shadow(0 14px 13px rgba(0,0,0,.34));
+}
+.heroChoice .premiumHeroImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+}
+.heroChoice .pixelAvatar span { display: none; }
+.heroChoice strong { font-size: 22px !important; letter-spacing: -.02em; }
+.heroChoice small, .heroChoice p { color: #aebbd1; }
+.hero-nova { --hero-accent: #38cbff; }
+.hero-lyra { --hero-accent: #cf7cff; }
+.hero-kael { --hero-accent: #ffbe45; }
+.hero-mira { --hero-accent: #ff6cae; }
+
+/* ---------- Shared arena shell ---------- */
+.arenaFrame {
+  position: relative;
+  border: 1px solid rgba(95, 134, 205, .46) !important;
+  border-radius: 26px !important;
+  overflow: hidden;
+  background: #091329 !important;
+  box-shadow: 0 26px 80px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.05) !important;
+}
+.arenaFrame::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 55px rgba(6, 12, 32, .28);
+  z-index: 8;
+}
+.arenaTitleRow {
+  position: relative;
+  z-index: 10;
+  min-height: 72px !important;
+  padding: 12px 20px !important;
+  background: linear-gradient(180deg, rgba(13,27,61,.96), rgba(8,17,39,.95)) !important;
+  border-bottom: 1px solid rgba(98,140,218,.35) !important;
+  box-shadow: 0 10px 28px rgba(0,0,0,.14);
+}
+.arenaTitleRow strong {
+  font-size: clamp(19px, 2.2vw, 26px) !important;
+  letter-spacing: -.02em;
+  text-shadow: 0 2px 12px rgba(80,155,255,.2);
+}
+.modeKicker { color: #c5b9ff !important; }
+.roundChip {
+  background: linear-gradient(180deg, rgba(17,35,72,.95), rgba(6,14,32,.96)) !important;
+  border-color: rgba(113,157,234,.46) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 5px 18px rgba(0,0,0,.22);
+}
+.arenaScoreStrip {
+  position: relative;
+  z-index: 10;
+  min-height: 58px !important;
+  padding: 11px 18px !important;
+  background: linear-gradient(180deg, rgba(5,13,31,.98), rgba(8,18,42,.98)) !important;
+  border-top: 1px solid rgba(99,138,208,.32) !important;
+  font-size: 13px !important;
+  box-shadow: 0 -12px 28px rgba(0,0,0,.12);
+}
+.arenaScoreStrip strong {
+  font-size: 14px;
+  text-shadow: 0 0 16px rgba(255,255,255,.2);
+}
+
+/* ---------- Premium hero renderer ---------- */
+.pixelAvatar.premiumHero {
+  position: relative;
+  filter: drop-shadow(0 16px 12px rgba(0,0,0,.34));
+}
+.premiumHeroImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  image-rendering: auto !important;
+  filter: saturate(1.06) contrast(1.03) drop-shadow(0 0 12px color-mix(in srgb, var(--hero-accent, #55cfff) 30%, transparent));
+}
+.pixelAvatar.premiumHero::before {
+  content: "";
+  position: absolute;
+  width: 72%;
+  height: 18%;
+  left: 14%;
+  bottom: -4%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--hero-accent, #55cfff) 30%, transparent), transparent 70%);
+  filter: blur(5px);
+}
+
+/* ---------- Tug of War ---------- */
+.tugArenaWrap {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(52,174,239,.18), transparent 38%),
+    #90d8f6;
+}
+.tugArenaWrap::before {
+  content: "MATH ARENA   ✦   POWER DUEL   ✦   MATH ARENA";
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 9%;
+  transform: translateX(-50%);
+  width: min(620px, 76%);
+  padding: 8px 16px;
+  text-align: center;
+  border-radius: 999px;
+  color: rgba(255,255,255,.9);
+  background: linear-gradient(90deg, rgba(24,83,174,.78), rgba(91,69,190,.78));
+  border: 1px solid rgba(255,255,255,.3);
+  box-shadow: 0 7px 22px rgba(33,82,151,.22);
+  font-size: clamp(8px, 1vw, 12px);
+  font-weight: 950;
+  letter-spacing: .14em;
+  pointer-events: none;
+}
+.tugArenaWrap::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  top: 28%;
+  height: 22%;
+  background:
+    repeating-linear-gradient(90deg, rgba(30,70,137,.22) 0 7%, rgba(255,201,66,.18) 7% 9%, transparent 9% 13%),
+    linear-gradient(180deg, rgba(38,94,167,.18), rgba(21,67,130,.08));
+  border-top: 1px solid rgba(255,255,255,.22);
+  border-bottom: 1px solid rgba(32,73,129,.16);
+  pointer-events: none;
+}
+.phaserArena, .phaserArena canvas {
+  image-rendering: auto !important;
+}
+.tugPremiumHero {
+  z-index: 6 !important;
+  width: clamp(100px, 14vw, 190px) !important;
+  filter: drop-shadow(0 20px 15px rgba(0,0,0,.28)) drop-shadow(0 0 16px color-mix(in srgb, var(--hero-accent, #55cfff) 25%, transparent));
+}
+.tugPremiumHero img { image-rendering: auto !important; }
+.tugNameBadge {
+  z-index: 9 !important;
+  background: rgba(247,250,255,.92) !important;
+  color: #0b1a33 !important;
+  border: 1px solid rgba(255,255,255,.72) !important;
+  box-shadow: 0 8px 25px rgba(21,61,104,.16) !important;
+  backdrop-filter: blur(10px);
+}
+
+/* ---------- Math Racing ---------- */
+.raceWorld {
+  background:
+    radial-gradient(circle at 50% 0, rgba(47,130,255,.42), transparent 36%),
+    linear-gradient(180deg, #101c4e 0%, #112046 38%, #101529 100%) !important;
+}
+.raceScene {
+  min-height: 390px !important;
+  padding: 66px clamp(18px, 3vw, 38px) 42px !important;
+  background:
+    linear-gradient(180deg, rgba(34,109,202,.08), rgba(6,12,29,.18)),
+    radial-gradient(circle at 50% 4%, rgba(65,208,255,.18), transparent 30%);
+}
+.raceBackdrop {
+  height: 44% !important;
+  background:
+    radial-gradient(circle at 50% 14%, rgba(119,219,255,.26), transparent 30%),
+    linear-gradient(180deg, #214a9c 0%, #263c7e 50%, #171d4d 100%) !important;
+  border-bottom: 4px solid rgba(71,206,255,.8);
+  box-shadow: 0 8px 25px rgba(33,179,255,.28);
+}
+.raceBackdrop::before {
+  content: "";
+  position: absolute;
+  left: 3%; right: 3%; bottom: 8px;
+  height: 42px;
+  background:
+    repeating-linear-gradient(90deg, rgba(35,217,255,.85) 0 24px, rgba(31,78,153,.1) 24px 42px, rgba(255,180,50,.75) 42px 60px, transparent 60px 80px);
+  clip-path: polygon(0 45%, 100% 45%, 100% 70%, 0 70%);
+  opacity: .75;
+}
+.raceBackdrop::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 36px;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 3%, transparent 3% 6%);
+}
+.raceLaneWrap {
+  grid-template-columns: minmax(72px, auto) 1fr 62px !important;
+  gap: 12px !important;
+  margin: 21px 0 !important;
+}
+.laneLabel.laneName {
+  width: auto !important;
+  max-width: 128px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 12px !important;
+  padding: 8px 10px !important;
+  background: linear-gradient(145deg, rgba(14,36,78,.97), rgba(7,20,46,.98)) !important;
+  border: 1px solid rgba(92,160,235,.5) !important;
+  box-shadow: 0 7px 20px rgba(0,0,0,.2);
+  color: white !important;
+}
+.raceLane {
+  height: 100px !important;
+  border: 2px solid rgba(124,174,235,.5) !important;
+  border-radius: 14px !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.035), transparent),
+    repeating-linear-gradient(90deg, transparent 0 7%, rgba(218,230,247,.7) 7% 10%, transparent 10% 15%),
+    linear-gradient(180deg, #27344e, #18243b) !important;
+  background-size: auto, 100% 5px, auto !important;
+  background-position: center, center, center !important;
+  background-repeat: no-repeat !important;
+  box-shadow: inset 0 0 24px rgba(1,5,18,.5), 0 0 24px rgba(32,152,255,.09);
+  overflow: visible !important;
+}
+.raceLaneWrap:nth-of-type(2) .raceLane { box-shadow: inset 0 0 24px rgba(1,5,18,.5), 0 0 25px rgba(255,72,204,.11); }
+.finishLine {
+  width: 28px !important;
+  right: 4px !important;
+  top: -3px !important;
+  bottom: -3px !important;
+  border-radius: 2px;
+  background:
+    conic-gradient(#fff 25%, #111827 0 50%, #fff 0 75%, #111827 0) 0 0/16px 16px !important;
+  box-shadow: -4px 0 0 rgba(67,206,255,.45), 4px 0 0 rgba(255,83,203,.35), 0 0 18px rgba(255,255,255,.16);
+}
+.pixelKart {
+  width: 104px !important;
+  height: 55px !important;
+  bottom: 10px !important;
+  transition: left .48s cubic-bezier(.2,.8,.2,1) !important;
+  filter: drop-shadow(0 11px 7px rgba(0,0,0,.35));
+}
+.kartBody {
+  left: 9px !important; right: 6px !important; bottom: 11px !important; height: 28px !important;
+  border-radius: 34px 42px 13px 18px !important;
+  border: 2px solid rgba(255,255,255,.32) !important;
+  background: linear-gradient(140deg, #22c7ff, #1c64e7 52%, #0d2e8b) !important;
+  box-shadow: 0 0 17px rgba(44,204,255,.55), inset 0 6px 8px rgba(255,255,255,.14) !important;
+}
+.playerB .kartBody { background: linear-gradient(140deg, #ff76cd, #e339a9 52%, #711f94) !important; box-shadow: 0 0 18px rgba(255,64,201,.5), inset 0 6px 8px rgba(255,255,255,.13) !important; }
+.pixelKart::before {
+  content: "";
+  position: absolute;
+  right: 78%;
+  bottom: 17px;
+  width: 70px;
+  height: 10px;
+  background: linear-gradient(90deg, transparent, rgba(52,214,255,.55));
+  filter: blur(3px);
+  z-index: -1;
+}
+.playerB .pixelKart::before { background: linear-gradient(90deg, transparent, rgba(255,77,209,.48)); }
+.kartHero { width: 62px !important; bottom: 20px !important; left: 18px !important; }
+.kartWheel { width: 20px !important; height: 20px !important; border: 4px solid #0b1223 !important; background: radial-gradient(circle, #68ddff 0 28%, #202d47 30% 55%, #080d18 58%) !important; box-shadow: 0 0 10px rgba(66,213,255,.5); }
+.playerB .kartWheel { background: radial-gradient(circle, #ff79df 0 28%, #42204c 30% 55%, #080d18 58%) !important; box-shadow: 0 0 10px rgba(255,86,214,.48); }
+.laneProgress { color: #fff !important; font-size: 14px !important; font-weight: 950 !important; text-shadow: 0 0 12px rgba(79,203,255,.5); }
+
+/* ---------- Boss Battle ---------- */
+.bossWorld {
+  background:
+    radial-gradient(circle at 50% 45%, rgba(156,75,255,.42), transparent 28%),
+    radial-gradient(circle at 50% 45%, #372263 0%, #171635 38%, #080d21 78%) !important;
+}
+.bossWorld .arenaTitleRow { background: linear-gradient(180deg, rgba(31,22,72,.98), rgba(12,14,38,.97)) !important; }
+.bossHud {
+  position: relative;
+  z-index: 5;
+  background: rgba(8,12,36,.82);
+  border-bottom: 1px solid rgba(150,92,255,.32);
+  box-shadow: 0 10px 30px rgba(11,5,40,.25);
+}
+.hpTrack { height: 22px !important; border-radius: 999px !important; background: #35182d !important; border: 2px solid rgba(255,111,157,.45) !important; box-shadow: inset 0 3px 7px rgba(0,0,0,.48), 0 0 20px rgba(255,75,142,.15); overflow: hidden; }
+.hpTrack span { background: linear-gradient(90deg, #ff3f82, #ff7858) !important; box-shadow: 0 0 20px rgba(255,72,125,.48); }
+.battleStage {
+  min-height: 430px !important;
+  background:
+    radial-gradient(circle at 50% 52%, transparent 0 18%, rgba(105,65,204,.15) 18.4% 19%, transparent 19.4% 27%, rgba(129,71,232,.12) 27.5% 28.2%, transparent 28.5%),
+    linear-gradient(180deg, rgba(20,15,58,.2), rgba(7,12,31,.54));
+  overflow: hidden;
+}
+.battleStage::before {
+  content: "Σ        π       x²        △        ∞";
+  position: absolute;
+  inset: 15% 2% auto;
+  color: rgba(206,158,255,.16);
+  font-size: clamp(30px, 5vw, 70px);
+  font-weight: 950;
+  letter-spacing: .22em;
+  text-align: center;
+  text-shadow: 0 0 22px rgba(141,67,255,.45);
+  animation: glyphFloat 4.5s ease-in-out infinite alternate;
+}
+.battleStage::after {
+  content: "";
+  position: absolute;
+  width: min(420px, 45vw);
+  aspect-ratio: 1;
+  left: 50%; top: 49%;
+  transform: translate(-50%,-50%);
+  border: 2px solid rgba(167,104,255,.2);
+  border-radius: 50%;
+  box-shadow: 0 0 30px rgba(132,65,255,.35), inset 0 0 45px rgba(132,65,255,.13), 0 0 0 30px rgba(117,67,217,.035), 0 0 0 62px rgba(117,67,217,.028);
+  animation: portalPulse 2.4s ease-in-out infinite alternate;
+}
+@keyframes glyphFloat { to { transform: translateY(-9px); opacity: .75; } }
+@keyframes portalPulse { to { transform: translate(-50%,-50%) scale(1.035); box-shadow: 0 0 50px rgba(132,65,255,.48), inset 0 0 65px rgba(132,65,255,.2), 0 0 0 34px rgba(117,67,217,.04), 0 0 0 70px rgba(117,67,217,.03); } }
+.bossMonster {
+  z-index: 4 !important;
+  transform: scale(1.18);
+  filter: drop-shadow(0 18px 20px rgba(0,0,0,.44)) drop-shadow(0 0 28px rgba(162,82,255,.36));
+}
+.bossMonster::before {
+  content: "";
+  position: absolute;
+  inset: -22px;
+  z-index: -1;
+  border-radius: 48%;
+  background: radial-gradient(circle, rgba(152,82,255,.24), transparent 68%);
+  filter: blur(6px);
+}
+.battlePlayer { z-index: 6 !important; }
+.battlePlayer .pixelAvatar { width: clamp(96px, 13vw, 160px) !important; }
+.attackFx { filter: drop-shadow(0 0 13px #fff) drop-shadow(0 0 20px currentColor); }
+.damageBurst { text-shadow: 0 0 16px currentColor, 0 3px 3px rgba(0,0,0,.45) !important; font-size: clamp(22px, 4vw, 42px) !important; }
+
+/* ---------- Bomb Defuse ---------- */
+.bombWorld {
+  background:
+    radial-gradient(circle at 50% 5%, rgba(54,111,218,.22), transparent 34%),
+    linear-gradient(180deg, #101932, #090f20 54%, #070c17) !important;
+}
+.bombWorld .arenaTitleRow { background: linear-gradient(180deg, rgba(18,31,64,.98), rgba(8,15,32,.97)) !important; }
+.bombStage {
+  min-height: 470px !important;
+  background:
+    linear-gradient(90deg, rgba(38,105,172,.08) 1px, transparent 1px),
+    linear-gradient(rgba(38,105,172,.06) 1px, transparent 1px),
+    radial-gradient(circle at 50% 35%, rgba(31,97,183,.17), transparent 38%),
+    linear-gradient(180deg, rgba(9,17,35,.4), rgba(4,9,19,.68)) !important;
+  background-size: 42px 42px, 42px 42px, auto, auto !important;
+}
+.bombStage::before {
+  content: "MATH LAB  •  DEFUSE PROTOCOL";
+  position: absolute;
+  left: 50%; top: 22px;
+  transform: translateX(-50%);
+  color: rgba(131,205,255,.45);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .2em;
+}
+.bombDevice {
+  position: relative;
+  background: linear-gradient(155deg, #303a4c, #151d2b 55%, #0d1420) !important;
+  border: 3px solid #54637a !important;
+  box-shadow: 0 22px 46px rgba(0,0,0,.48), inset 0 0 0 4px #111827, inset 0 10px 24px rgba(255,255,255,.045), 0 0 28px rgba(44,122,230,.12) !important;
+}
+.bombDevice::before,
+.bombDevice::after {
+  content: "";
+  position: absolute;
+  width: 54px; height: 11px;
+  top: -14px;
+  border: 4px solid #5c687a;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background: #171f2c;
+}
+.bombDevice::before { left: 14%; }
+.bombDevice::after { right: 14%; }
+.bombTimer {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  letter-spacing: .12em !important;
+  color: #ff6578 !important;
+  background: #17070d !important;
+  border: 2px solid #682532 !important;
+  box-shadow: inset 0 0 16px rgba(255,42,75,.2), 0 0 18px rgba(255,67,94,.12) !important;
+  text-shadow: 0 0 12px rgba(255,75,96,.65);
+}
+.wireBoard {
+  background: linear-gradient(180deg, #151e2b, #0b121e) !important;
+  border: 1px solid #4b5b72 !important;
+  box-shadow: inset 0 8px 20px rgba(0,0,0,.32) !important;
+}
+.wire {
+  box-shadow: 0 0 10px currentColor, inset 2px 0 3px rgba(255,255,255,.24) !important;
+  border: 1px solid rgba(255,255,255,.16);
+}
+.wireStep {
+  background: linear-gradient(180deg, #263244, #141c29) !important;
+  border: 1px solid #44536a !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.07);
+}
+.missionMeters > div {
+  background: linear-gradient(180deg, rgba(18,29,50,.97), rgba(8,15,28,.98)) !important;
+  border-color: rgba(81,115,165,.48) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.04);
+}
+.bombProgress { box-shadow: inset 0 2px 5px rgba(0,0,0,.35); }
+.bombProgress span { box-shadow: 0 0 16px rgba(58,218,255,.55); }
+
+/* ---------- Mobile/tablet visual fit ---------- */
+@media (max-width: 760px) {
+  .heroChoice { min-height: 148px !important; }
+  .heroChoice .pixelAvatar { width: 88px !important; height: 126px; }
+  .heroChoice strong { font-size: 18px !important; }
+  .tugArenaWrap::before { top: 6%; width: 82%; letter-spacing: .08em; }
+  .tugPremiumHero { width: clamp(78px, 24vw, 126px) !important; }
+  .raceScene { min-height: 330px !important; padding: 52px 10px 28px !important; }
+  .raceLaneWrap { grid-template-columns: 62px 1fr 42px !important; gap: 5px !important; }
+  .laneLabel.laneName { font-size: 10px !important; padding: 6px !important; }
+  .raceLane { height: 78px !important; }
+  .pixelKart { transform: scale(.8); transform-origin: left bottom; }
+  .battleStage { min-height: 340px !important; }
+  .battlePlayer .pixelAvatar { width: clamp(72px, 22vw, 112px) !important; }
+  .bossMonster { transform: scale(.92); }
+  .bombStage { min-height: 390px !important; }
+}
+
+@media (max-width: 520px) {
+  .characterPicker { grid-template-columns: 1fr 1fr !important; gap: 9px !important; }
+  .heroChoice { min-height: 130px !important; padding: 10px !important; }
+  .heroChoice .pixelAvatar { width: 68px !important; height: 105px; }
+  .heroChoice strong { font-size: 15px !important; }
+  .heroChoice p, .heroChoice small { font-size: 10px !important; line-height: 1.3; }
+  .arenaTitleRow { min-height: 60px !important; padding: 9px 11px !important; }
+  .arenaTitleRow strong { font-size: 17px !important; }
+  .arenaScoreStrip { padding: 8px 10px !important; font-size: 10px !important; }
+  .raceLaneWrap { grid-template-columns: 48px 1fr 34px !important; }
+  .laneLabel.laneName { max-width: 48px; }
+}

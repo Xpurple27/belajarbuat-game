@@ -1,5 +1,7 @@
 "use client";
 
+import type { CSSProperties } from "react";
+
 export type HeroId = "nova" | "lyra" | "kael" | "mira";
 export const HERO_IDS: HeroId[] = ["nova", "lyra", "kael", "mira"];
 
@@ -17,11 +19,11 @@ interface PixelAvatarProps {
   characterId?: HeroId;
 }
 
-export const HERO_ART: Record<HeroId, { name: string; src: string }> = {
-  nova: { name: "Nova", src: "/heroes/nova.webp" },
-  lyra: { name: "Lyra", src: "/heroes/lyra.webp" },
-  kael: { name: "Kael", src: "/heroes/kael.webp" },
-  mira: { name: "Mira", src: "/heroes/mira.webp" },
+export const HERO_ART: Record<HeroId, { name: string; src: string; accent: string }> = {
+  nova: { name: "Nova", src: "/heroes/nova.webp?v=4", accent: "#36c8ff" },
+  lyra: { name: "Lyra", src: "/heroes/lyra.webp?v=4", accent: "#d77cff" },
+  kael: { name: "Kael", src: "/heroes/kael.webp?v=4", accent: "#ffbe45" },
+  mira: { name: "Mira", src: "/heroes/mira.webp?v=4", accent: "#ff6cab" },
 };
 
 export default function PixelAvatar({
@@ -39,12 +41,14 @@ export default function PixelAvatar({
       aria-label={`${label ?? hero.name} · ${state}`}
       data-hero={characterId}
       data-state={state}
+      style={{ "--hero-accent": hero.accent } as CSSProperties}
     >
       <img
         className={`premiumHeroImage premiumSide-${side}`}
         src={hero.src}
         alt={label ?? hero.name}
         draggable={false}
+        decoding="async"
       />
       {label && <span>{label}</span>}
     </div>
