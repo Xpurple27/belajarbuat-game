@@ -51,6 +51,7 @@ type PublicQuestion = {
   power_value?: number;
 };
 
+const ROUND_DURATION_SECONDS = 60;
 const GAME_LABEL: Record<GameMode, string> = {
   "tug-of-war": "Tug of War",
   racing: "Math Racing",
@@ -66,7 +67,7 @@ function normalizeQuestion(question: PublicQuestion | null): PublicQuestion | nu
     questionType: question.questionType ?? question.question_type,
     questionText: question.questionText ?? question.question_text,
     questionImageUrl: question.questionImageUrl ?? question.question_image_url,
-    estimatedTimeSeconds: question.estimatedTimeSeconds ?? question.estimated_time_seconds ?? 60,
+    estimatedTimeSeconds: question.estimatedTimeSeconds ?? question.estimated_time_seconds ?? ROUND_DURATION_SECONDS,
     powerValue: question.powerValue ?? question.power_value,
   };
 }
@@ -74,6 +75,11 @@ function normalizeQuestion(question: PublicQuestion | null): PublicQuestion | nu
 function answerKey(option: string, index: number): string {
   const match = option.match(/^\s*([A-E])(?:[.):-]|\s)/i);
   return match?.[1]?.toUpperCase() ?? String.fromCharCode(65 + index);
+}
+
+function secondsRemaining(startedAtMs: number, duration = ROUND_DURATION_SECONDS): number {
+  if (!startedAtMs) return duration;
+  return Math.max(0, duration - Math.floor((Date.now() - startedAtMs) / 1000));
 }
 
 export default function PlayerPage() {
@@ -95,7 +101,25 @@ export default function PlayerPage() {
   const [connection, setConnection] = useState("CONNECTING");
   const [soundOn, setSoundOn] = useState(true);
   const startedAtRef = useRef(0);
+  const currentQuestionIdRef = useRef<string | null>(null);
   const sessionRef = useRef<PlayerSession | null>(null);
+  const soundOnRef = useRef(true);
+
+  useEffect(() => { soundOnRef.current = soundOn; }, [soundOn]);
+
+  const syncQuestion = useCallback((incoming: PublicQuestion | null, startedAtMs: number) => {
+    const normalized = normalizeQuestion(incoming);
+    if (!normalized) return;
+    const isNew = currentQuestionIdRef.current !== normalized.id;
+    currentQuestionIdRef.current = normalized.id;
+    startedAtRef.current = startedAtMs || Date.now();
+    setQuestion(normalized);
+    setSecondsLeft(secondsRemaining(startedAtRef.current, normalized.estimatedTimeSeconds ?? ROUND_DURATION_SECONDS));
+    if (isNew) {
+      setSubmitted(false);
+      setFeedback("");
+    }
+  }, []);
 
   const loadSnapshot = useCallback(async (currentSession: PlayerSession) => {
     const response = await fetch(`/api/rooms/${code}?playerId=${encodeURIComponent(currentSession.id)}`, {
@@ -123,12 +147,10 @@ export default function PlayerPage() {
       })));
     }
     if (data.question && data.room.status === "playing") {
-      const normalized = normalizeQuestion(data.question);
-      setQuestion(normalized);
-      setSecondsLeft(60);
-      startedAtRef.current = Date.now();
+      const startedAtMs = data.room.roundStartedAt ? new Date(data.room.roundStartedAt).getTime() : Date.now();
+      syncQuestion(data.question, startedAtMs);
     }
-  }, [code]);
+  }, [code, syncQuestion]);
 
   useEffect(() => {
     const raw = sessionStorage.getItem(`arena-player-${code}`);
@@ -156,16 +178,11 @@ export default function PlayerPage() {
       .on("broadcast", { event: "round-start" }, ({ payload }) => {
         const activeSession = sessionRef.current;
         if (!activeSession) return;
-        const nextQuestion = normalizeQuestion(payload.questions?.[activeSession.side] ?? null);
         if (payload.gameMode) setCurrentGame(payload.gameMode);
-        setQuestion(nextQuestion);
         setRound(payload.roundNumber ?? 0);
         setRoomStatus("playing");
-        setSubmitted(false);
-        setFeedback("");
-        setSecondsLeft(Number(payload.durationSeconds) || 60);
-        startedAtRef.current = Number(payload.startedAt) || Date.now();
-        if (soundOn) playSfx("start");
+        syncQuestion(payload.questions?.[activeSession.side] ?? null, Number(payload.startedAt) || Date.now());
+        if (soundOnRef.current) playSfx("start");
       })
       .on("broadcast", { event: "round-resolved" }, ({ payload }) => {
         if (payload.gameMode) setCurrentGame(payload.gameMode);
@@ -176,22 +193,25 @@ export default function PlayerPage() {
           const own = payload.answers[ownSide];
           setFeedback(own.correct ? `Benar! +${own.power} power` : "Belum tepat. +0 power");
         }
-        if (soundOn) playSfx(payload.gameComplete ? "win" : "impact");
+        if (soundOnRef.current) playSfx(payload.gameComplete ? "win" : "impact");
       })
       .on("broadcast", { event: "game-changed" }, ({ payload }) => {
         setCurrentGame(payload.gameMode);
         setState(payload.state);
         setRound(0);
         setQuestion(null);
+        currentQuestionIdRef.current = null;
+        startedAtRef.current = 0;
         setSubmitted(false);
         setFeedback(`${GAME_LABEL[payload.gameMode as GameMode]} siap. Menunggu host.`);
         setRoomStatus("paused");
       })
       .on("broadcast", { event: "session-finished" }, () => {
         setQuestion(null);
+        currentQuestionIdRef.current = null;
         setRoomStatus("finished");
         setFeedback("Sesi Math Arena selesai. Great job!");
-        if (soundOn) playSfx("win");
+        if (soundOnRef.current) playSfx("win");
       })
       .on("presence", { event: "sync" }, () => setConnection("ONLINE"))
       .subscribe(async (status) => {
@@ -212,7 +232,7 @@ export default function PlayerPage() {
       void channel.untrack();
       void supabase.removeChannel(channel);
     };
-  }, [code, session, soundOn]);
+  }, [code, session, syncQuestion]);
 
   useEffect(() => {
     if (!session || roomStatus === "finished") return;
@@ -224,7 +244,7 @@ export default function PlayerPage() {
     const currentSession = sessionRef.current;
     if (!currentSession || submitted || roomStatus !== "playing") return;
     setSubmitted(true);
-    const responseTimeMs = startedAtRef.current ? Date.now() - startedAtRef.current : 0;
+    const responseTimeMs = startedAtRef.current ? Math.max(0, Date.now() - startedAtRef.current) : 0;
 
     try {
       const response = await fetch(`/api/rooms/${code}/answer`, {
@@ -238,23 +258,21 @@ export default function PlayerPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Jawaban gagal dikirim.");
       setFeedback(data.correct ? `Benar! +${data.powerAwarded} power` : data.waitingForOpponent ? "Belum tepat. Menunggu lawan..." : "Belum tepat. Ronde selesai.");
-      if (soundOn) playSfx(data.correct ? "correct" : "wrong");
+      if (soundOnRef.current) playSfx(data.correct ? "correct" : "wrong");
     } catch (error) {
       setSubmitted(false);
       setFeedback(error instanceof Error ? error.message : "Jawaban gagal dikirim.");
     }
-  }, [code, roomStatus, soundOn, submitted]);
+  }, [code, roomStatus, submitted]);
 
   useEffect(() => {
     if (roomStatus !== "playing" || submitted || !question || secondsLeft <= 0) return;
-    const timer = window.setTimeout(() => setSecondsLeft((value) => Math.max(0, value - 1)), 1000);
+    const timer = window.setTimeout(() => setSecondsLeft(secondsRemaining(startedAtRef.current, question.estimatedTimeSeconds ?? ROUND_DURATION_SECONDS)), 1000);
     return () => window.clearTimeout(timer);
   }, [question, roomStatus, secondsLeft, submitted]);
 
   useEffect(() => {
-    if (roomStatus === "playing" && question && secondsLeft === 0 && !submitted) {
-      void submitAnswer("__TIMEOUT__");
-    }
+    if (roomStatus === "playing" && question && secondsLeft === 0 && !submitted) void submitAnswer("__TIMEOUT__");
   }, [question, roomStatus, secondsLeft, submitAnswer, submitted]);
 
   const questionText = question?.questionText ?? (roomStatus === "finished" ? "Sesi selesai" : "Menunggu host memulai ronde...");
@@ -276,12 +294,7 @@ export default function PlayerPage() {
         <div style={{ display: "flex", gap: 8 }}><button className="button ghost" onClick={() => setSoundOn((value) => !value)}>{soundOn ? "Sound On" : "Sound Off"}</button><div className="status">● {connection}</div></div>
       </div>
 
-      <ArenaVisual
-        mode={currentGame}
-        state={state}
-        playerALabel={playerA?.displayName ?? "Player A"}
-        playerBLabel={playerB?.displayName ?? "Player B"}
-      />
+      <ArenaVisual mode={currentGame} state={state} playerALabel={playerA?.displayName ?? "Player A"} playerBLabel={playerB?.displayName ?? "Player B"} />
 
       <section className="questionPanel">
         <div className="questionMeta">
@@ -294,14 +307,7 @@ export default function PlayerPage() {
 
         <div className="answersGrid">
           {options.map((option, index) => (
-            <button
-              key={`${option}-${index}`}
-              type="button"
-              disabled={submitted || roomStatus !== "playing"}
-              onClick={() => void submitAnswer(answerKey(option, index))}
-            >
-              {option}
-            </button>
+            <button key={`${option}-${index}`} type="button" disabled={submitted || roomStatus !== "playing"} onClick={() => void submitAnswer(answerKey(option, index))}>{option}</button>
           ))}
         </div>
 
