@@ -5,7 +5,7 @@ create table if not exists public.arena_rooms (
   status text not null default 'waiting' check (status in ('waiting','playing','paused','finished')),
   current_game text not null default 'tug-of-war' check (current_game in ('tug-of-war','racing','boss-battle','bomb-defuse')),
   current_round integer not null default 0 check (current_round >= 0),
-  game_state jsonb not null default '{"position":0,"target":10,"winner":null}'::jsonb,
+  game_state jsonb not null default '{"kind":"tug-of-war","position":0,"target":10,"winner":null,"complete":false}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
