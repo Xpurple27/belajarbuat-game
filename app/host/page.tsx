@@ -244,7 +244,12 @@ export default function HostPage() {
           <p className="muted">Status: <strong>{roomStatus}</strong></p>
           {error && <div className="errorBox">{error}</div>}
           {roomStatus === "finished" ? (
-            <div className="winnerBox">Sesi 4 game selesai 🎉</div>
+            <>
+              <div className="winnerBox">Sesi 4 game selesai 🎉</div>
+              <a className="button primary" style={{ width: "100%" }} href={`/host/results/${hostSession.code}`}>
+                Lihat Hasil Belajar
+              </a>
+            </>
           ) : state.complete ? (
             <>
               <div className="winnerBox">{GAME_LABEL[currentGame]} selesai!</div>
