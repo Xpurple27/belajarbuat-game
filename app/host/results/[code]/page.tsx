@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import PixelAvatar from "@/src/components/PixelAvatar";
 
 type TopicStat = {
   topic: string;
@@ -64,7 +65,10 @@ export default function HostResultsPage() {
     <main className="shell">
       <div className="topbar">
         <div><p className="eyebrow">LEARNING ANALYTICS</p><div className="roomCode">ROOM {code}</div></div>
-        <a className="button" href="/host">Host</a>
+        <div className="resultActions">
+          <a className="button ghost" href="/">Home</a>
+          <a className="button primary" href="/host">Main Lagi</a>
+        </div>
       </div>
 
       {loading && <section className="panel">Menghitung hasil belajar...</section>}
@@ -73,17 +77,31 @@ export default function HostResultsPage() {
       <div className="resultsGrid">
         {results.map((result) => (
           <section className="panel resultCard" key={result.id}>
-            <p className="eyebrow">PLAYER {result.side} · KELAS {result.gradeLevel}</p>
-            <h2>{result.displayName}</h2>
-            <div className="metricGrid">
-              <div><strong>{result.accuracy}%</strong><span>Accuracy</span></div>
-              <div><strong>{result.correct}/{result.totalQuestions}</strong><span>Correct</span></div>
-              <div><strong>{(result.avgResponseMs / 1000).toFixed(1)}s</strong><span>Avg response</span></div>
+            <div className="resultCardHeader">
+              <div>
+                <p className="eyebrow">KELAS {result.gradeLevel} · HASIL PEMAIN</p>
+                <h2>{result.displayName}</h2>
+              </div>
             </div>
-            <div className="insightGrid">
-              <div><span>💪 Strongest</span><strong>{result.strongestTopic ?? "Belum cukup data"}</strong></div>
-              <div><span>🎯 Needs practice</span><strong>{result.needsPractice ?? "Belum cukup data"}</strong></div>
+
+            <div className="resultHeroGrid">
+              <div>
+                <div className="metricGrid">
+                  <div><strong>{result.accuracy}%</strong><span>Accuracy</span></div>
+                  <div><strong>{result.correct}/{result.totalQuestions}</strong><span>Correct</span></div>
+                  <div><strong>{(result.avgResponseMs / 1000).toFixed(1)}s</strong><span>Avg response</span></div>
+                </div>
+                <div className="insightGrid">
+                  <div><span>💪 Strongest</span><strong>{result.strongestTopic ?? "Belum cukup data"}</strong></div>
+                  <div><span>🎯 Needs practice</span><strong>{result.needsPractice ?? "Belum cukup data"}</strong></div>
+                </div>
+              </div>
+
+              <aside className="resultAvatarPanel" aria-label={`Karakter ${result.displayName}`}>
+                <PixelAvatar side={result.side} label={result.displayName} state="celebrate" />
+              </aside>
             </div>
+
             <div className="topicTable">
               <div className="topicRow header"><span>Topik</span><span>Akurasi</span><span>Waktu</span></div>
               {result.topicStats.map((topic) => (
@@ -93,6 +111,11 @@ export default function HostResultsPage() {
                   <span>{(topic.avgResponseMs / 1000).toFixed(1)}s</span>
                 </div>
               ))}
+            </div>
+
+            <div className="resultActions">
+              <a className="button ghost" href="/">Kembali ke Home</a>
+              <a className="button primary" href="/host">Buat Arena Baru</a>
             </div>
           </section>
         ))}
