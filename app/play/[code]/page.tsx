@@ -4,10 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ArenaVisual from "@/src/components/ArenaVisual";
 import { supabase } from "@/src/lib/supabase";
+import { playSfx } from "@/src/lib/sfx";
 import {
   createGameState,
+  type AiDifficulty,
   type ArenaGameState,
   type GameMode,
+  type OpponentMode,
   type PlayerSide,
 } from "@/src/core/game";
 
@@ -17,6 +20,15 @@ type PlayerSession = {
   side: PlayerSide;
   displayName: string;
   gradeLevel: number;
+};
+
+type PlayerInfo = {
+  id: string;
+  displayName: string;
+  gradeLevel: number;
+  side: PlayerSide;
+  playerType: "human" | "ai";
+  isHostPlayer: boolean;
 };
 
 type PublicQuestion = {
@@ -54,7 +66,7 @@ function normalizeQuestion(question: PublicQuestion | null): PublicQuestion | nu
     questionType: question.questionType ?? question.question_type,
     questionText: question.questionText ?? question.question_text,
     questionImageUrl: question.questionImageUrl ?? question.question_image_url,
-    estimatedTimeSeconds: question.estimatedTimeSeconds ?? question.estimated_time_seconds,
+    estimatedTimeSeconds: question.estimatedTimeSeconds ?? question.estimated_time_seconds ?? 60,
     powerValue: question.powerValue ?? question.power_value,
   };
 }
@@ -69,8 +81,11 @@ export default function PlayerPage() {
   const router = useRouter();
   const code = params.code;
   const [session, setSession] = useState<PlayerSession | null>(null);
+  const [players, setPlayers] = useState<PlayerInfo[]>([]);
   const [question, setQuestion] = useState<PublicQuestion | null>(null);
   const [roomStatus, setRoomStatus] = useState("waiting");
+  const [opponentMode, setOpponentMode] = useState<OpponentMode>("multiplayer");
+  const [aiDifficulty, setAiDifficulty] = useState<AiDifficulty>("medium");
   const [currentGame, setCurrentGame] = useState<GameMode>("tug-of-war");
   const [round, setRound] = useState(0);
   const [state, setState] = useState<ArenaGameState>(createGameState("tug-of-war"));
@@ -78,6 +93,7 @@ export default function PlayerPage() {
   const [submitted, setSubmitted] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [connection, setConnection] = useState("CONNECTING");
+  const [soundOn, setSoundOn] = useState(true);
   const startedAtRef = useRef(0);
   const sessionRef = useRef<PlayerSession | null>(null);
 
@@ -89,13 +105,27 @@ export default function PlayerPage() {
     if (!response.ok) return;
     const data = await response.json();
     setRoomStatus(data.room.status);
+    setOpponentMode(data.room.opponentMode ?? "multiplayer");
+    setAiDifficulty(data.room.aiDifficulty ?? "medium");
     setCurrentGame(data.room.currentGame);
     setRound(data.room.currentRound);
     if (data.room.gameState) setState(data.room.gameState);
-    if (data.question) {
+    if (Array.isArray(data.players)) {
+      setPlayers(data.players.map((player: {
+        id: string; display_name: string; grade_level: number; side: PlayerSide; player_type?: "human" | "ai"; is_host_player?: boolean;
+      }) => ({
+        id: player.id,
+        displayName: player.display_name,
+        gradeLevel: player.grade_level,
+        side: player.side,
+        playerType: player.player_type ?? "human",
+        isHostPlayer: Boolean(player.is_host_player),
+      })));
+    }
+    if (data.question && data.room.status === "playing") {
       const normalized = normalizeQuestion(data.question);
       setQuestion(normalized);
-      setSecondsLeft(normalized?.estimatedTimeSeconds ?? 60);
+      setSecondsLeft(60);
       startedAtRef.current = Date.now();
     }
   }, [code]);
@@ -133,8 +163,9 @@ export default function PlayerPage() {
         setRoomStatus("playing");
         setSubmitted(false);
         setFeedback("");
-        setSecondsLeft(nextQuestion?.estimatedTimeSeconds ?? 60);
+        setSecondsLeft(Number(payload.durationSeconds) || 60);
         startedAtRef.current = Number(payload.startedAt) || Date.now();
+        if (soundOn) playSfx("start");
       })
       .on("broadcast", { event: "round-resolved" }, ({ payload }) => {
         if (payload.gameMode) setCurrentGame(payload.gameMode);
@@ -145,6 +176,7 @@ export default function PlayerPage() {
           const own = payload.answers[ownSide];
           setFeedback(own.correct ? `Benar! +${own.power} power` : "Belum tepat. +0 power");
         }
+        if (soundOn) playSfx(payload.gameComplete ? "win" : "impact");
       })
       .on("broadcast", { event: "game-changed" }, ({ payload }) => {
         setCurrentGame(payload.gameMode);
@@ -159,6 +191,7 @@ export default function PlayerPage() {
         setQuestion(null);
         setRoomStatus("finished");
         setFeedback("Sesi Math Arena selesai. Great job!");
+        if (soundOn) playSfx("win");
       })
       .on("presence", { event: "sync" }, () => setConnection("ONLINE"))
       .subscribe(async (status) => {
@@ -179,7 +212,13 @@ export default function PlayerPage() {
       void channel.untrack();
       void supabase.removeChannel(channel);
     };
-  }, [code, session]);
+  }, [code, session, soundOn]);
+
+  useEffect(() => {
+    if (!session || roomStatus === "finished") return;
+    const timer = window.setInterval(() => void loadSnapshot(session), 7000);
+    return () => window.clearInterval(timer);
+  }, [loadSnapshot, roomStatus, session]);
 
   const submitAnswer = useCallback(async (answer: string) => {
     const currentSession = sessionRef.current;
@@ -198,12 +237,13 @@ export default function PlayerPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Jawaban gagal dikirim.");
-      setFeedback(data.correct ? `Benar! +${data.powerAwarded} power` : "Belum tepat. Menunggu lawan...");
+      setFeedback(data.correct ? `Benar! +${data.powerAwarded} power` : data.waitingForOpponent ? "Belum tepat. Menunggu lawan..." : "Belum tepat. Ronde selesai.");
+      if (soundOn) playSfx(data.correct ? "correct" : "wrong");
     } catch (error) {
       setSubmitted(false);
       setFeedback(error instanceof Error ? error.message : "Jawaban gagal dikirim.");
     }
-  }, [code, roomStatus, submitted]);
+  }, [code, roomStatus, soundOn, submitted]);
 
   useEffect(() => {
     if (roomStatus !== "playing" || submitted || !question || secondsLeft <= 0) return;
@@ -217,8 +257,11 @@ export default function PlayerPage() {
     }
   }, [question, roomStatus, secondsLeft, submitAnswer, submitted]);
 
-  const questionText = question?.questionText ?? (roomStatus === "finished" ? "Sesi selesai 🎉" : "Menunggu host memulai ronde...");
+  const questionText = question?.questionText ?? (roomStatus === "finished" ? "Sesi selesai" : "Menunggu host memulai ronde...");
   const options = useMemo(() => (Array.isArray(question?.options) ? question.options : []), [question]);
+  const playerA = players.find((item) => item.side === "A");
+  const playerB = players.find((item) => item.side === "B");
+  const opponent = players.find((item) => item.side !== session?.side);
 
   if (!session) return <main className="shell"><div className="panel">Memuat sesi pemain...</div></main>;
 
@@ -227,18 +270,24 @@ export default function PlayerPage() {
       <div className="topbar">
         <div>
           <p className="eyebrow">PLAYER {session.side} · KELAS {session.gradeLevel} · {GAME_LABEL[currentGame].toUpperCase()}</p>
-          <div className="roomCode">{session.displayName} · ROOM {code}</div>
+          <div className="roomCode">{session.displayName} <span style={{ color: "#66738b" }}>VS</span> {opponent?.displayName ?? "..."}</div>
+          <div className="setupSummary"><span className="infoChip">ROOM {code}</span><span className="infoChip">{opponentMode === "ai" ? `CPU ${aiDifficulty.toUpperCase()}` : "MULTIPLAYER"}</span></div>
         </div>
-        <div className="status">● {connection}</div>
+        <div style={{ display: "flex", gap: 8 }}><button className="button ghost" onClick={() => setSoundOn((value) => !value)}>{soundOn ? "Sound On" : "Sound Off"}</button><div className="status">● {connection}</div></div>
       </div>
 
-      <ArenaVisual mode={currentGame} state={state} />
+      <ArenaVisual
+        mode={currentGame}
+        state={state}
+        playerALabel={playerA?.displayName ?? "Player A"}
+        playerBLabel={playerB?.displayName ?? "Player B"}
+      />
 
       <section className="questionPanel">
         <div className="questionMeta">
           <span>{GAME_LABEL[currentGame]} · Round {round}</span>
           <span>{question?.difficulty?.toUpperCase() ?? "WAITING"}</span>
-          <span className={secondsLeft <= 10 && roomStatus === "playing" ? "timer danger" : "timer"}>{secondsLeft}s</span>
+          <span className={secondsLeft <= 10 && roomStatus === "playing" ? "timer danger" : "timer"}>{roomStatus === "playing" ? `${secondsLeft}s` : roomStatus.toUpperCase()}</span>
         </div>
         <h2>{questionText}</h2>
         {question && <p className="muted">{question.topic}{question.subtopic ? ` · ${question.subtopic}` : ""}</p>}
