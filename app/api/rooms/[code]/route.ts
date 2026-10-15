@@ -8,7 +8,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cod
     const supabase = createSupabaseAdmin();
     const { data: room, error: roomError } = await supabase
       .from("arena_rooms")
-      .select("id, code, host_token_hash, status, current_game, current_round, game_state")
+      .select("id, code, host_token_hash, status, current_game, current_round, game_state, opponent_mode, ai_difficulty")
       .eq("code", code)
       .single();
 
@@ -21,16 +21,16 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cod
     const playerId = request.nextUrl.searchParams.get("playerId");
 
     const isHost = tokenMatches(hostToken, room.host_token_hash);
-    let requestingPlayer: { id: string; side: string; player_token_hash: string } | null = null;
+    let requestingPlayer: { id: string; side: string; player_token_hash: string; player_type: string } | null = null;
 
     if (!isHost && playerId && playerToken) {
       const { data } = await supabase
         .from("arena_players")
-        .select("id, side, player_token_hash")
+        .select("id, side, player_token_hash, player_type")
         .eq("id", playerId)
         .eq("room_id", room.id)
         .single();
-      if (data && tokenMatches(playerToken, data.player_token_hash)) requestingPlayer = data;
+      if (data && data.player_type === "human" && tokenMatches(playerToken, data.player_token_hash)) requestingPlayer = data;
     }
 
     if (!isHost && !requestingPlayer) {
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cod
 
     const { data: players } = await supabase
       .from("arena_players")
-      .select("id, display_name, grade_level, side, is_connected")
+      .select("id, display_name, grade_level, side, is_connected, player_type, is_host_player")
       .eq("room_id", room.id)
       .order("side");
 
@@ -71,6 +71,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cod
         currentGame: room.current_game,
         currentRound: room.current_round,
         gameState: room.game_state,
+        opponentMode: room.opponent_mode,
+        aiDifficulty: room.ai_difficulty,
       },
       players,
       question,
