@@ -5,11 +5,11 @@ import { useEffect, useRef } from "react";
 interface TugArenaProps {
   position: number;
   target?: number;
-  winner?: "A" | "B" | null;
+  winner?: "A" | "B" | "draw" | null;
 }
 
 type SceneController = {
-  setMatchState: (position: number, winner: "A" | "B" | null) => void;
+  setMatchState: (position: number, winner: "A" | "B" | "draw" | null) => void;
 };
 
 export default function TugArena({ position, target = 10, winner = null }: TugArenaProps) {
@@ -28,7 +28,7 @@ export default function TugArena({ position, target = 10, winner = null }: TugAr
       class TugScene extends Phaser.Scene implements SceneController {
         private arenaGraphics!: InstanceType<typeof Phaser.GameObjects.Graphics>;
         private currentPosition = position;
-        private currentWinner: "A" | "B" | null = winner;
+        private currentWinner: "A" | "B" | "draw" | null = winner;
 
         constructor() {
           super("TugScene");
@@ -39,13 +39,13 @@ export default function TugArena({ position, target = 10, winner = null }: TugAr
           this.drawArena();
         }
 
-        setMatchState(nextPosition: number, nextWinner: "A" | "B" | null) {
+        setMatchState(nextPosition: number, nextWinner: "A" | "B" | "draw" | null) {
           const previous = this.currentPosition;
           this.currentWinner = nextWinner;
           this.tweens.addCounter({
             from: previous,
             to: nextPosition,
-            duration: 360,
+            duration: 420,
             ease: "Quad.Out",
             onUpdate: (tween) => {
               this.currentPosition = tween.getValue() ?? nextPosition;
@@ -75,7 +75,8 @@ export default function TugArena({ position, target = 10, winner = null }: TugAr
           g.fillStyle(shirtColor, 1);
           g.fillRect(x - px * 2, groundY - px * 7, px * 4, px * 4);
           g.fillStyle(0xf2c6a0, 1);
-          g.fillRect(x + facing * px * 2, groundY - px * 7, px * 3 * facing, px);
+          if (facing === 1) g.fillRect(x + px * 2, groundY - px * 7, px * 3, px);
+          else g.fillRect(x - px * 5, groundY - px * 7, px * 3, px);
           g.fillStyle(0x30415d, 1);
           g.fillRect(x - px * 2, groundY - px * 3, px * 2, px * 3);
           g.fillRect(x + px / 2, groundY - px * 3, px * 2, px * 3);
@@ -90,7 +91,7 @@ export default function TugArena({ position, target = 10, winner = null }: TugAr
 
           g.fillStyle(0x9dd7f5, 1);
           g.fillRect(0, 0, 960, 420);
-          g.fillStyle(0xffffff, 0.85);
+          g.fillStyle(0xffffff, 0.82);
           g.fillRect(90, 55, 120, 28);
           g.fillRect(700, 80, 145, 26);
           g.fillStyle(0x74bd63, 1);
@@ -130,7 +131,9 @@ export default function TugArena({ position, target = 10, winner = null }: TugAr
             g.fillStyle(0x101820, 0.78);
             g.fillRoundedRect(330, 120, 300, 76, 12);
             g.fillStyle(0xffdf5d, 1);
-            g.fillRect(this.currentWinner === "A" ? 285 : 635, 180, 18, 18);
+            if (this.currentWinner === "A") g.fillRect(285, 180, 18, 18);
+            if (this.currentWinner === "B") g.fillRect(657, 180, 18, 18);
+            if (this.currentWinner === "draw") g.fillRect(471, 180, 18, 18);
           }
         }
       }
