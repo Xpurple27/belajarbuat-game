@@ -3,7 +3,7 @@ name: Math Arena CI
 on:
   push:
     branches:
-      - feat/math-arena-mvp
+      - feat/math-arena-complete
   pull_request:
     branches:
       - main
@@ -20,6 +20,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
