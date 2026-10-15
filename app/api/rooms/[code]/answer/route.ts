@@ -2,12 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/src/lib/supabase-server";
 import { tokenMatches } from "@/src/lib/tokens";
 import { broadcastRoomEvent } from "@/src/lib/realtime-server";
-import { createTugOfWarState, resolveTugOfWarRound, type TugOfWarState } from "@/src/core/game";
+import {
+  createGameState,
+  resolveArenaRound,
+  type ArenaGameState,
+  type Difficulty,
+  type GameMode,
+  type RoundAnswer,
+} from "@/src/core/game";
 
 interface AnswerBody {
   playerId?: string;
   answer?: string;
   responseTimeMs?: number;
+}
+
+function difficultyFromPower(power: number): Difficulty {
+  return power >= 3 ? "hard" : power === 2 ? "medium" : "easy";
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ code: string }> }) {
@@ -38,6 +49,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
       return NextResponse.json({ error: "Tidak ada ronde aktif." }, { status: 409 });
     }
 
+    const gameMode = room.current_game as GameMode;
     const { data: player, error: playerError } = await supabase
       .from("arena_players")
       .select("id, side, player_token_hash")
@@ -54,7 +66,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
       .select("question_id")
       .eq("room_id", room.id)
       .eq("player_id", player.id)
-      .eq("game_mode", "tug-of-war")
+      .eq("game_mode", gameMode)
       .eq("round_number", room.current_round)
       .single();
 
@@ -77,7 +89,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
       room_id: room.id,
       player_id: player.id,
       question_id: question.id,
-      game_mode: "tug-of-war",
+      game_mode: gameMode,
       round_number: room.current_round,
       submitted_answer: submittedAnswer,
       is_correct: isCorrect,
@@ -94,13 +106,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
       .from("arena_answers")
       .select("player_id, is_correct, response_time_ms, power_awarded")
       .eq("room_id", room.id)
-      .eq("game_mode", "tug-of-war")
+      .eq("game_mode", gameMode)
       .eq("round_number", room.current_round);
 
     if (answersError) throw answersError;
 
     let resolved = false;
-    let nextState: TugOfWarState | null = null;
+    let nextState: ArenaGameState | null = null;
 
     if (roundAnswers?.length === 2) {
       const { data: players } = await supabase
@@ -110,33 +122,29 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
 
       const sideById = new Map((players ?? []).map((item) => [item.id, item.side]));
       const bySide = new Map(roundAnswers.map((item) => [sideById.get(item.player_id), item]));
-      const answerA = bySide.get("A");
-      const answerB = bySide.get("B");
+      const rawA = bySide.get("A");
+      const rawB = bySide.get("B");
 
-      if (answerA && answerB) {
-        const current = (room.game_state ?? createTugOfWarState()) as TugOfWarState;
-        nextState = resolveTugOfWarRound(
-          current,
-          {
-            player: "A",
-            correct: answerA.is_correct,
-            difficulty: answerA.power_awarded === 3 ? "hard" : answerA.power_awarded === 2 ? "medium" : "easy",
-            responseTimeMs: answerA.response_time_ms,
-          },
-          {
-            player: "B",
-            correct: answerB.is_correct,
-            difficulty: answerB.power_awarded === 3 ? "hard" : answerB.power_awarded === 2 ? "medium" : "easy",
-            responseTimeMs: answerB.response_time_ms,
-          },
-        );
+      if (rawA && rawB) {
+        const toRoundAnswer = (side: "A" | "B", raw: typeof rawA): RoundAnswer => ({
+          player: side,
+          correct: raw.is_correct,
+          difficulty: difficultyFromPower(raw.power_awarded),
+          responseTimeMs: raw.response_time_ms,
+        });
+        const answerA = toRoundAnswer("A", rawA);
+        const answerB = toRoundAnswer("B", rawB);
+        const current = ((room.game_state as ArenaGameState | null)?.kind
+          ? room.game_state
+          : createGameState(gameMode)) as ArenaGameState;
 
-        const status = nextState.winner ? "finished" : "paused";
+        nextState = resolveArenaRound(current, answerA, answerB);
+
         const { error: updateError } = await supabase
           .from("arena_rooms")
           .update({
             game_state: nextState,
-            status,
+            status: "paused",
             updated_at: new Date().toISOString(),
           })
           .eq("id", room.id);
@@ -144,13 +152,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
 
         resolved = true;
         await broadcastRoomEvent(code, "round-resolved", {
+          gameMode,
           roundNumber: room.current_round,
           state: nextState,
           answers: {
-            A: { correct: answerA.is_correct, power: answerA.power_awarded },
-            B: { correct: answerB.is_correct, power: answerB.power_awarded },
+            A: { correct: rawA.is_correct, power: rawA.power_awarded },
+            B: { correct: rawB.is_correct, power: rawB.power_awarded },
           },
-          matchFinished: Boolean(nextState.winner),
+          gameComplete: nextState.complete,
         });
       }
     }
