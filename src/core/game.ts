@@ -1,6 +1,9 @@
 export type Difficulty = "easy" | "medium" | "hard";
 export type PlayerSide = "A" | "B";
 export type GameMode = "tug-of-war" | "racing" | "boss-battle" | "bomb-defuse";
+export type OpponentMode = "multiplayer" | "ai";
+export type AiDifficulty = "easy" | "medium" | "hard";
+export type ArenaWinner = PlayerSide | "draw" | null;
 
 export const GAME_ORDER: GameMode[] = ["tug-of-war", "racing", "boss-battle", "bomb-defuse"];
 
@@ -17,54 +20,86 @@ export interface RoundAnswer {
   responseTimeMs: number;
 }
 
-export interface TugOfWarState {
-  kind: "tug-of-war";
-  position: number;
-  target: number;
-  winner: PlayerSide | null;
+interface RoundBoundedState {
+  roundsPlayed: number;
+  maxRounds: number;
   complete: boolean;
 }
 
-export interface RacingState {
+export interface TugOfWarState extends RoundBoundedState {
+  kind: "tug-of-war";
+  position: number;
+  target: number;
+  winner: ArenaWinner;
+  totalPowerA: number;
+  totalPowerB: number;
+  lastDelta: number;
+}
+
+export interface RacingState extends RoundBoundedState {
   kind: "racing";
   distanceA: number;
   distanceB: number;
   target: number;
-  winner: PlayerSide | "draw" | null;
-  complete: boolean;
+  winner: ArenaWinner;
+  totalTimeA: number;
+  totalTimeB: number;
 }
 
-export interface BossBattleState {
+export interface BossBattleState extends RoundBoundedState {
   kind: "boss-battle";
   bossHp: number;
   maxBossHp: number;
   totalDamageA: number;
   totalDamageB: number;
   lastCombo: boolean;
-  complete: boolean;
+  lastDamage: number;
+  success: boolean;
 }
 
-export interface BombDefuseState {
+export interface BombDefuseState extends RoundBoundedState {
   kind: "bomb-defuse";
   correctContributions: number;
   targetContributions: number;
   strikes: number;
   maxStrikes: number;
-  complete: boolean;
   success: boolean;
+  lastCorrect: number;
 }
 
 export type ArenaGameState = TugOfWarState | RacingState | BossBattleState | BombDefuseState;
 
-export function createTugOfWarState(target = 10): TugOfWarState {
-  return { kind: "tug-of-war", position: 0, target, winner: null, complete: false };
+export function createTugOfWarState(target = 10, maxRounds = 10): TugOfWarState {
+  return {
+    kind: "tug-of-war",
+    position: 0,
+    target,
+    winner: null,
+    complete: false,
+    roundsPlayed: 0,
+    maxRounds,
+    totalPowerA: 0,
+    totalPowerB: 0,
+    lastDelta: 0,
+  };
 }
 
-export function createRacingState(target = 20): RacingState {
-  return { kind: "racing", distanceA: 0, distanceB: 0, target, winner: null, complete: false };
+export function createRacingState(target = 18, maxRounds = 8): RacingState {
+  return {
+    kind: "racing",
+    distanceA: 0,
+    distanceB: 0,
+    target,
+    winner: null,
+    complete: false,
+    roundsPlayed: 0,
+    maxRounds,
+    totalTimeA: 0,
+    totalTimeB: 0,
+  };
 }
 
-export function createBossBattleState(maxBossHp = 200): BossBattleState {
+export function createBossBattleState(maxBossHp = 220, maxRounds = 6): BossBattleState {
   return {
     kind: "boss-battle",
     bossHp: maxBossHp,
@@ -72,11 +107,15 @@ export function createBossBattleState(maxBossHp = 200): BossBattleState {
     totalDamageA: 0,
     totalDamageB: 0,
     lastCombo: false,
+    lastDamage: 0,
     complete: false,
+    success: false,
+    roundsPlayed: 0,
+    maxRounds,
   };
 }
 
-export function createBombDefuseState(targetContributions = 6, maxStrikes = 4): BombDefuseState {
+export function createBombDefuseState(targetContributions = 6, maxStrikes = 4, maxRounds = 4): BombDefuseState {
   return {
     kind: "bomb-defuse",
     correctContributions: 0,
@@ -85,6 +124,9 @@ export function createBombDefuseState(targetContributions = 6, maxStrikes = 4): 
     maxStrikes,
     complete: false,
     success: false,
+    lastCorrect: 0,
+    roundsPlayed: 0,
+    maxRounds,
   };
 }
 
@@ -97,18 +139,46 @@ export function createGameState(mode: GameMode): ArenaGameState {
   }
 }
 
+function powerFor(answer: RoundAnswer): number {
+  return answer.correct ? POWER_BY_DIFFICULTY[answer.difficulty] : 0;
+}
+
 export function resolveTugOfWarRound(
   state: TugOfWarState,
   answerA: RoundAnswer,
   answerB: RoundAnswer,
 ): TugOfWarState {
   if (state.complete) return state;
-  const powerA = answerA.correct ? POWER_BY_DIFFICULTY[answerA.difficulty] : 0;
-  const powerB = answerB.correct ? POWER_BY_DIFFICULTY[answerB.difficulty] : 0;
-  const rawPosition = state.position + powerA - powerB;
+  const powerA = powerFor(answerA);
+  const powerB = powerFor(answerB);
+  const lastDelta = powerA - powerB;
+  const rawPosition = state.position + lastDelta;
   const position = Math.max(-state.target, Math.min(state.target, rawPosition));
-  const winner = position >= state.target ? "A" : position <= -state.target ? "B" : null;
-  return { ...state, position, winner, complete: winner !== null };
+  const roundsPlayed = state.roundsPlayed + 1;
+  const totalPowerA = state.totalPowerA + powerA;
+  const totalPowerB = state.totalPowerB + powerB;
+
+  let winner: ArenaWinner = position >= state.target ? "A" : position <= -state.target ? "B" : null;
+  if (!winner && roundsPlayed >= state.maxRounds) {
+    if (position > 0) winner = "A";
+    else if (position < 0) winner = "B";
+    else if (totalPowerA > totalPowerB) winner = "A";
+    else if (totalPowerB > totalPowerA) winner = "B";
+    else if (answerA.responseTimeMs < answerB.responseTimeMs) winner = "A";
+    else if (answerB.responseTimeMs < answerA.responseTimeMs) winner = "B";
+    else winner = "draw";
+  }
+
+  return {
+    ...state,
+    position,
+    winner,
+    complete: winner !== null,
+    roundsPlayed,
+    totalPowerA,
+    totalPowerB,
+    lastDelta,
+  };
 }
 
 export function resolveRacingRound(
@@ -117,16 +187,37 @@ export function resolveRacingRound(
   answerB: RoundAnswer,
 ): RacingState {
   if (state.complete) return state;
-  const distanceA = Math.min(state.target, state.distanceA + (answerA.correct ? POWER_BY_DIFFICULTY[answerA.difficulty] : 0));
-  const distanceB = Math.min(state.target, state.distanceB + (answerB.correct ? POWER_BY_DIFFICULTY[answerB.difficulty] : 0));
+  const distanceA = Math.min(state.target, state.distanceA + powerFor(answerA));
+  const distanceB = Math.min(state.target, state.distanceB + powerFor(answerB));
+  const totalTimeA = state.totalTimeA + answerA.responseTimeMs;
+  const totalTimeB = state.totalTimeB + answerB.responseTimeMs;
+  const roundsPlayed = state.roundsPlayed + 1;
   const aFinished = distanceA >= state.target;
   const bFinished = distanceB >= state.target;
-  let winner: RacingState["winner"] = null;
+
+  let winner: ArenaWinner = null;
   if (aFinished && bFinished) {
     winner = answerA.responseTimeMs === answerB.responseTimeMs ? "draw" : answerA.responseTimeMs < answerB.responseTimeMs ? "A" : "B";
   } else if (aFinished) winner = "A";
   else if (bFinished) winner = "B";
-  return { ...state, distanceA, distanceB, winner, complete: winner !== null };
+  else if (roundsPlayed >= state.maxRounds) {
+    if (distanceA > distanceB) winner = "A";
+    else if (distanceB > distanceA) winner = "B";
+    else if (totalTimeA < totalTimeB) winner = "A";
+    else if (totalTimeB < totalTimeA) winner = "B";
+    else winner = "draw";
+  }
+
+  return {
+    ...state,
+    distanceA,
+    distanceB,
+    winner,
+    complete: winner !== null,
+    roundsPlayed,
+    totalTimeA,
+    totalTimeB,
+  };
 }
 
 export function resolveBossBattleRound(
@@ -135,19 +226,26 @@ export function resolveBossBattleRound(
   answerB: RoundAnswer,
 ): BossBattleState {
   if (state.complete) return state;
-  const damageFor = (answer: RoundAnswer) => answer.correct ? POWER_BY_DIFFICULTY[answer.difficulty] * 10 : 0;
-  const damageA = damageFor(answerA);
-  const damageB = damageFor(answerB);
+  const damageA = powerFor(answerA) * 10;
+  const damageB = powerFor(answerB) * 10;
   const combo = answerA.correct && answerB.correct;
   const comboDamage = combo ? 10 : 0;
-  const bossHp = Math.max(0, state.bossHp - damageA - damageB - comboDamage);
+  const lastDamage = damageA + damageB + comboDamage;
+  const bossHp = Math.max(0, state.bossHp - lastDamage);
+  const roundsPlayed = state.roundsPlayed + 1;
+  const success = bossHp === 0;
+  const complete = success || roundsPlayed >= state.maxRounds;
+
   return {
     ...state,
     bossHp,
     totalDamageA: state.totalDamageA + damageA,
     totalDamageB: state.totalDamageB + damageB,
     lastCombo: combo,
-    complete: bossHp === 0,
+    lastDamage,
+    success,
+    complete,
+    roundsPlayed,
   };
 }
 
@@ -161,14 +259,18 @@ export function resolveBombDefuseRound(
   const wrongThisRound = 2 - correctThisRound;
   const correctContributions = Math.min(state.targetContributions, state.correctContributions + correctThisRound);
   const strikes = Math.min(state.maxStrikes, state.strikes + wrongThisRound);
+  const roundsPlayed = state.roundsPlayed + 1;
   const success = correctContributions >= state.targetContributions;
-  const failed = strikes >= state.maxStrikes && !success;
+  const failed = strikes >= state.maxStrikes || (roundsPlayed >= state.maxRounds && !success);
+
   return {
     ...state,
     correctContributions,
     strikes,
     success,
     complete: success || failed,
+    lastCorrect: correctThisRound,
+    roundsPlayed,
   };
 }
 
