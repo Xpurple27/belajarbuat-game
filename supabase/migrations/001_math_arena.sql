@@ -1,17 +1,19 @@
-create table if not exists public.rooms (
+create table if not exists public.arena_rooms (
   id uuid primary key default gen_random_uuid(),
   code text not null unique check (code ~ '^[0-9]{6}$'),
+  host_token_hash text not null,
   status text not null default 'waiting' check (status in ('waiting','playing','paused','finished')),
   current_game text not null default 'tug-of-war' check (current_game in ('tug-of-war','racing','boss-battle','bomb-defuse')),
   current_round integer not null default 0 check (current_round >= 0),
-  game_state jsonb not null default '{}'::jsonb,
+  game_state jsonb not null default '{"position":0,"target":10,"winner":null}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
-create table if not exists public.players (
+create table if not exists public.arena_players (
   id uuid primary key default gen_random_uuid(),
-  room_id uuid not null references public.rooms(id) on delete cascade,
+  room_id uuid not null references public.arena_rooms(id) on delete cascade,
+  player_token_hash text not null,
   display_name text not null check (char_length(display_name) between 1 and 24),
   grade_level integer not null check (grade_level between 1 and 12),
   side text not null check (side in ('A','B')),
@@ -20,7 +22,7 @@ create table if not exists public.players (
   unique (room_id, side)
 );
 
-create table if not exists public.questions (
+create table if not exists public.arena_questions (
   id uuid primary key default gen_random_uuid(),
   grade_level integer not null check (grade_level between 1 and 12),
   subject text not null default 'mathematics',
@@ -40,30 +42,43 @@ create table if not exists public.questions (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.answers (
+create table if not exists public.arena_round_assignments (
   id uuid primary key default gen_random_uuid(),
-  room_id uuid not null references public.rooms(id) on delete cascade,
-  player_id uuid not null references public.players(id) on delete cascade,
-  question_id uuid not null references public.questions(id),
+  room_id uuid not null references public.arena_rooms(id) on delete cascade,
+  player_id uuid not null references public.arena_players(id) on delete cascade,
+  question_id uuid not null references public.arena_questions(id),
+  game_mode text not null check (game_mode in ('tug-of-war','racing','boss-battle','bomb-defuse')),
+  round_number integer not null check (round_number > 0),
+  assigned_at timestamptz not null default now(),
+  unique (room_id, player_id, game_mode, round_number)
+);
+
+create table if not exists public.arena_answers (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references public.arena_rooms(id) on delete cascade,
+  player_id uuid not null references public.arena_players(id) on delete cascade,
+  question_id uuid not null references public.arena_questions(id),
   game_mode text not null check (game_mode in ('tug-of-war','racing','boss-battle','bomb-defuse')),
   round_number integer not null check (round_number > 0),
   submitted_answer text,
   is_correct boolean not null,
   response_time_ms integer not null check (response_time_ms >= 0),
   power_awarded integer not null default 0 check (power_awarded between 0 and 3),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (room_id, player_id, game_mode, round_number)
 );
 
-create index if not exists idx_players_room_id on public.players(room_id);
-create index if not exists idx_questions_grade_topic on public.questions(grade_level, topic, difficulty) where is_active = true;
-create index if not exists idx_answers_room_player on public.answers(room_id, player_id);
+create index if not exists idx_arena_players_room on public.arena_players(room_id);
+create index if not exists idx_arena_questions_grade on public.arena_questions(grade_level, difficulty) where is_active = true;
+create index if not exists idx_arena_answers_room_player on public.arena_answers(room_id, player_id);
 
-alter table public.rooms enable row level security;
-alter table public.players enable row level security;
-alter table public.questions enable row level security;
-alter table public.answers enable row level security;
+alter table public.arena_rooms enable row level security;
+alter table public.arena_players enable row level security;
+alter table public.arena_questions enable row level security;
+alter table public.arena_round_assignments enable row level security;
+alter table public.arena_answers enable row level security;
 
--- Intentionally no permissive anon/authenticated policies yet.
--- The next milestone will add a secure room/session model before exposing rows
--- through the Data API. This prevents answer keys in public.questions from being
--- readable directly by a player client.
+-- Browser clients never read these tables directly. Next.js server routes use the
+-- service-role key and only return sanitized question payloads without answer keys.
+revoke all on public.arena_rooms, public.arena_players, public.arena_questions,
+  public.arena_round_assignments, public.arena_answers from anon, authenticated;
