@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ArenaVisual from "@/src/components/ArenaVisual";
+import type { HeroId } from "@/src/components/PixelAvatar";
 import { supabase } from "@/src/lib/supabase";
 import { playSfx } from "@/src/lib/sfx";
 import {
@@ -20,6 +21,7 @@ type PlayerSession = {
   side: PlayerSide;
   displayName: string;
   gradeLevel: number;
+  characterId?: HeroId;
 };
 
 type PlayerInfo = {
@@ -88,6 +90,7 @@ export default function PlayerPage() {
   const code = params.code;
   const [session, setSession] = useState<PlayerSession | null>(null);
   const [players, setPlayers] = useState<PlayerInfo[]>([]);
+  const [characters, setCharacters] = useState<Record<string, HeroId>>({});
   const [question, setQuestion] = useState<PublicQuestion | null>(null);
   const [roomStatus, setRoomStatus] = useState("waiting");
   const [opponentMode, setOpponentMode] = useState<OpponentMode>("multiplayer");
@@ -107,6 +110,15 @@ export default function PlayerPage() {
 
   useEffect(() => { soundOnRef.current = soundOn; }, [soundOn]);
 
+  const loadCharacters = useCallback(async () => {
+    const response = await fetch(`/api/rooms/${code}/character`, { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json();
+    const next: Record<string, HeroId> = {};
+    for (const item of data.characters ?? []) next[item.id] = item.characterId === "lyra" ? "lyra" : "nova";
+    setCharacters(next);
+  }, [code]);
+
   const syncQuestion = useCallback((incoming: PublicQuestion | null, startedAtMs: number) => {
     const normalized = normalizeQuestion(incoming);
     if (!normalized) return;
@@ -123,8 +135,7 @@ export default function PlayerPage() {
 
   const loadSnapshot = useCallback(async (currentSession: PlayerSession) => {
     const response = await fetch(`/api/rooms/${code}?playerId=${encodeURIComponent(currentSession.id)}`, {
-      headers: { "x-player-token": currentSession.token },
-      cache: "no-store",
+      headers: { "x-player-token": currentSession.token }, cache: "no-store",
     });
     if (!response.ok) return;
     const data = await response.json();
@@ -135,44 +146,32 @@ export default function PlayerPage() {
     setRound(data.room.currentRound);
     if (data.room.gameState) setState(data.room.gameState);
     if (Array.isArray(data.players)) {
-      setPlayers(data.players.map((player: {
-        id: string; display_name: string; grade_level: number; side: PlayerSide; player_type?: "human" | "ai"; is_host_player?: boolean;
-      }) => ({
-        id: player.id,
-        displayName: player.display_name,
-        gradeLevel: player.grade_level,
-        side: player.side,
-        playerType: player.player_type ?? "human",
-        isHostPlayer: Boolean(player.is_host_player),
+      setPlayers(data.players.map((player: { id:string; display_name:string; grade_level:number; side:PlayerSide; player_type?:"human"|"ai"; is_host_player?:boolean }) => ({
+        id:player.id, displayName:player.display_name, gradeLevel:player.grade_level, side:player.side,
+        playerType:player.player_type ?? "human", isHostPlayer:Boolean(player.is_host_player),
       })));
     }
     if (data.question && data.room.status === "playing") {
       const startedAtMs = data.room.roundStartedAt ? new Date(data.room.roundStartedAt).getTime() : Date.now();
       syncQuestion(data.question, startedAtMs);
     }
-  }, [code, syncQuestion]);
+    void loadCharacters();
+  }, [code, loadCharacters, syncQuestion]);
 
   useEffect(() => {
     const raw = sessionStorage.getItem(`arena-player-${code}`);
-    if (!raw) {
-      router.replace(`/join?room=${code}`);
-      return;
-    }
+    if (!raw) { router.replace(`/join?room=${code}`); return; }
     try {
       const parsed = JSON.parse(raw) as PlayerSession;
       sessionRef.current = parsed;
       setSession(parsed);
       void loadSnapshot(parsed);
-    } catch {
-      router.replace(`/join?room=${code}`);
-    }
+    } catch { router.replace(`/join?room=${code}`); }
   }, [code, loadSnapshot, router]);
 
   useEffect(() => {
     if (!session) return;
-    const channel = supabase.channel(`arena-room-${code}`, {
-      config: { presence: { key: session.id } },
-    });
+    const channel = supabase.channel(`arena-room-${code}`, { config: { presence: { key: session.id } } });
 
     channel
       .on("broadcast", { event: "round-start" }, ({ payload }) => {
@@ -185,7 +184,8 @@ export default function PlayerPage() {
         if (soundOnRef.current) playSfx("start");
       })
       .on("broadcast", { event: "round-resolved" }, ({ payload }) => {
-        if (payload.gameMode) setCurrentGame(payload.gameMode);
+        const gameMode = payload.gameMode as GameMode;
+        setCurrentGame(gameMode);
         setState(payload.state);
         setRoomStatus("paused");
         const ownSide = sessionRef.current?.side;
@@ -193,45 +193,35 @@ export default function PlayerPage() {
           const own = payload.answers[ownSide];
           setFeedback(own.correct ? `Benar! +${own.power} power` : "Belum tepat. +0 power");
         }
-        if (soundOnRef.current) playSfx(payload.gameComplete ? "win" : "impact");
+        if (soundOnRef.current) {
+          if (gameMode === "tug-of-war") playSfx(payload.gameComplete ? "win" : "rope");
+          else if (gameMode === "racing") playSfx(payload.gameComplete ? "win" : "engine");
+          else if (gameMode === "boss-battle") playSfx(payload.gameComplete ? (payload.state?.success ? "win" : "defeat") : "bossHit");
+          else if (gameMode === "bomb-defuse" && payload.gameComplete) {
+            if (payload.state?.success) playSfx("win");
+            else { playSfx("alarm"); window.setTimeout(() => { if (soundOnRef.current) playSfx("explosion"); }, 520); }
+          } else playSfx("impact");
+        }
+      })
+      .on("broadcast", { event: "character-changed" }, ({ payload }) => {
+        if (payload.playerId) setCharacters((current) => ({ ...current, [String(payload.playerId)]: payload.characterId === "lyra" ? "lyra" : "nova" }));
       })
       .on("broadcast", { event: "game-changed" }, ({ payload }) => {
-        setCurrentGame(payload.gameMode);
-        setState(payload.state);
-        setRound(0);
-        setQuestion(null);
-        currentQuestionIdRef.current = null;
-        startedAtRef.current = 0;
-        setSubmitted(false);
-        setFeedback(`${GAME_LABEL[payload.gameMode as GameMode]} siap. Menunggu host.`);
-        setRoomStatus("paused");
+        setCurrentGame(payload.gameMode); setState(payload.state); setRound(0); setQuestion(null);
+        currentQuestionIdRef.current = null; startedAtRef.current = 0; setSubmitted(false);
+        setFeedback(`${GAME_LABEL[payload.gameMode as GameMode]} siap. Menunggu host.`); setRoomStatus("paused");
       })
       .on("broadcast", { event: "session-finished" }, () => {
-        setQuestion(null);
-        currentQuestionIdRef.current = null;
-        setRoomStatus("finished");
-        setFeedback("Sesi Math Arena selesai. Great job!");
-        if (soundOnRef.current) playSfx("win");
+        setQuestion(null); currentQuestionIdRef.current = null; setRoomStatus("finished");
+        setFeedback("Sesi Math Arena selesai. Great job!"); if (soundOnRef.current) playSfx("win");
       })
       .on("presence", { event: "sync" }, () => setConnection("ONLINE"))
       .subscribe(async (status) => {
         setConnection(status);
-        if (status === "SUBSCRIBED") {
-          await channel.track({
-            role: "player",
-            playerId: session.id,
-            side: session.side,
-            displayName: session.displayName,
-            gradeLevel: session.gradeLevel,
-            onlineAt: new Date().toISOString(),
-          });
-        }
+        if (status === "SUBSCRIBED") await channel.track({ role:"player",playerId:session.id,side:session.side,displayName:session.displayName,gradeLevel:session.gradeLevel,onlineAt:new Date().toISOString() });
       });
 
-    return () => {
-      void channel.untrack();
-      void supabase.removeChannel(channel);
-    };
+    return () => { void channel.untrack(); void supabase.removeChannel(channel); };
   }, [code, session, syncQuestion]);
 
   useEffect(() => {
@@ -245,23 +235,17 @@ export default function PlayerPage() {
     if (!currentSession || submitted || roomStatus !== "playing") return;
     setSubmitted(true);
     const responseTimeMs = startedAtRef.current ? Math.max(0, Date.now() - startedAtRef.current) : 0;
-
     try {
       const response = await fetch(`/api/rooms/${code}/answer`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-player-token": currentSession.token,
-        },
-        body: JSON.stringify({ playerId: currentSession.id, answer, responseTimeMs }),
+        method:"POST", headers:{"content-type":"application/json","x-player-token":currentSession.token},
+        body:JSON.stringify({playerId:currentSession.id,answer,responseTimeMs}),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Jawaban gagal dikirim.");
       setFeedback(data.correct ? `Benar! +${data.powerAwarded} power` : data.waitingForOpponent ? "Belum tepat. Menunggu lawan..." : "Belum tepat. Ronde selesai.");
       if (soundOnRef.current) playSfx(data.correct ? "correct" : "wrong");
     } catch (error) {
-      setSubmitted(false);
-      setFeedback(error instanceof Error ? error.message : "Jawaban gagal dikirim.");
+      setSubmitted(false); setFeedback(error instanceof Error ? error.message : "Jawaban gagal dikirim.");
     }
   }, [code, roomStatus, submitted]);
 
@@ -271,15 +255,15 @@ export default function PlayerPage() {
     return () => window.clearTimeout(timer);
   }, [question, roomStatus, secondsLeft, submitted]);
 
-  useEffect(() => {
-    if (roomStatus === "playing" && question && secondsLeft === 0 && !submitted) void submitAnswer("__TIMEOUT__");
-  }, [question, roomStatus, secondsLeft, submitAnswer, submitted]);
+  useEffect(() => { if (roomStatus === "playing" && question && secondsLeft === 0 && !submitted) void submitAnswer("__TIMEOUT__"); }, [question, roomStatus, secondsLeft, submitAnswer, submitted]);
 
   const questionText = question?.questionText ?? (roomStatus === "finished" ? "Sesi selesai" : "Menunggu host memulai ronde...");
   const options = useMemo(() => (Array.isArray(question?.options) ? question.options : []), [question]);
   const playerA = players.find((item) => item.side === "A");
   const playerB = players.find((item) => item.side === "B");
   const opponent = players.find((item) => item.side !== session?.side);
+  const playerACharacter = playerA ? characters[playerA.id] ?? (playerA.playerType === "ai" ? "lyra" : "nova") : "nova";
+  const playerBCharacter = playerB ? characters[playerB.id] ?? "lyra" : "lyra";
 
   if (!session) return <main className="shell"><div className="panel">Memuat sesi pemain...</div></main>;
 
@@ -287,30 +271,23 @@ export default function PlayerPage() {
     <main className="shell gameShell">
       <div className="topbar">
         <div>
-          <p className="eyebrow">PLAYER {session.side} · KELAS {session.gradeLevel} · {GAME_LABEL[currentGame].toUpperCase()}</p>
-          <div className="roomCode">{session.displayName} <span style={{ color: "#66738b" }}>VS</span> {opponent?.displayName ?? "..."}</div>
+          <p className="eyebrow">KELAS {session.gradeLevel} · {GAME_LABEL[currentGame].toUpperCase()}</p>
+          <div className="roomCode">{session.displayName} <span style={{ color:"#66738b" }}>VS</span> {opponent?.displayName ?? "..."}</div>
           <div className="setupSummary"><span className="infoChip">ROOM {code}</span><span className="infoChip">{opponentMode === "ai" ? `CPU ${aiDifficulty.toUpperCase()}` : "MULTIPLAYER"}</span></div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}><button className="button ghost" onClick={() => setSoundOn((value) => !value)}>{soundOn ? "Sound On" : "Sound Off"}</button><div className="status">● {connection}</div></div>
+        <div style={{display:"flex",gap:8}}><button className="button ghost" onClick={() => setSoundOn((value) => !value)}>{soundOn ? "🔊 Sound On" : "🔇 Sound Off"}</button><div className="status">● {connection}</div></div>
       </div>
 
-      <ArenaVisual mode={currentGame} state={state} playerALabel={playerA?.displayName ?? "Player A"} playerBLabel={playerB?.displayName ?? "Player B"} />
+      <ArenaVisual mode={currentGame} state={state} playerALabel={playerA?.displayName ?? "Player 1"} playerBLabel={playerB?.displayName ?? "Player 2"} playerACharacter={playerACharacter} playerBCharacter={playerBCharacter} />
 
       <section className="questionPanel">
         <div className="questionMeta">
-          <span>{GAME_LABEL[currentGame]} · Round {round}</span>
-          <span>{question?.difficulty?.toUpperCase() ?? "WAITING"}</span>
+          <span>{GAME_LABEL[currentGame]} · Round {round}</span><span>{question?.difficulty?.toUpperCase() ?? "WAITING"}</span>
           <span className={secondsLeft <= 10 && roomStatus === "playing" ? "timer danger" : "timer"}>{roomStatus === "playing" ? `${secondsLeft}s` : roomStatus.toUpperCase()}</span>
         </div>
         <h2>{questionText}</h2>
         {question && <p className="muted">{question.topic}{question.subtopic ? ` · ${question.subtopic}` : ""}</p>}
-
-        <div className="answersGrid">
-          {options.map((option, index) => (
-            <button key={`${option}-${index}`} type="button" disabled={submitted || roomStatus !== "playing"} onClick={() => void submitAnswer(answerKey(option, index))}>{option}</button>
-          ))}
-        </div>
-
+        <div className="answersGrid">{options.map((option,index) => <button key={`${option}-${index}`} type="button" disabled={submitted || roomStatus !== "playing"} onClick={() => void submitAnswer(answerKey(option,index))}>{option}</button>)}</div>
         {feedback && <div className="feedbackBox">{feedback}</div>}
         {roomStatus === "paused" && state.complete && <div className="winnerBox">{GAME_LABEL[currentGame]} selesai. Menunggu host melanjutkan.</div>}
         {roomStatus === "paused" && !state.complete && <p className="muted centerText">Ronde selesai. Menunggu host memulai soal berikutnya.</p>}
