@@ -17,7 +17,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cod
     const hostToken = request.headers.get("x-host-token");
     const playerToken = request.headers.get("x-player-token");
     const playerId = request.nextUrl.searchParams.get("playerId");
-
     const isHost = tokenMatches(hostToken, room.host_token_hash);
     let requestingPlayer: { id: string; side: string; player_token_hash: string; player_type: string } | null = null;
 
@@ -40,16 +39,28 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cod
       .order("side");
 
     let question = null;
+    let hasAnswered = false;
     if (requestingPlayer && room.current_round > 0 && room.status !== "waiting") {
-      const { data: assignment } = await supabase
-        .from("arena_round_assignments")
-        .select("question_id")
-        .eq("room_id", room.id)
-        .eq("player_id", requestingPlayer.id)
-        .eq("game_mode", room.current_game)
-        .eq("round_number", room.current_round)
-        .maybeSingle();
+      const [{ data: assignment }, { data: existingAnswer }] = await Promise.all([
+        supabase
+          .from("arena_round_assignments")
+          .select("question_id")
+          .eq("room_id", room.id)
+          .eq("player_id", requestingPlayer.id)
+          .eq("game_mode", room.current_game)
+          .eq("round_number", room.current_round)
+          .maybeSingle(),
+        supabase
+          .from("arena_answers")
+          .select("id")
+          .eq("room_id", room.id)
+          .eq("player_id", requestingPlayer.id)
+          .eq("game_mode", room.current_game)
+          .eq("round_number", room.current_round)
+          .maybeSingle(),
+      ]);
 
+      hasAnswered = Boolean(existingAnswer);
       if (assignment) {
         const { data } = await supabase
           .from("arena_questions")
@@ -73,6 +84,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cod
       },
       players,
       question,
+      hasAnswered,
     });
   } catch (error) {
     console.error("room snapshot failed", error);
