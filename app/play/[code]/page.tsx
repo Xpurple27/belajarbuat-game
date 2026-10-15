@@ -2,15 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import TugArena from "@/src/components/TugArena";
+import ArenaVisual from "@/src/components/ArenaVisual";
 import { supabase } from "@/src/lib/supabase";
-
-type Side = "A" | "B";
+import {
+  createGameState,
+  type ArenaGameState,
+  type GameMode,
+  type PlayerSide,
+} from "@/src/core/game";
 
 type PlayerSession = {
   id: string;
   token: string;
-  side: Side;
+  side: PlayerSide;
   displayName: string;
   gradeLevel: number;
 };
@@ -35,7 +39,12 @@ type PublicQuestion = {
   power_value?: number;
 };
 
-type TugState = { position: number; target: number; winner: Side | null };
+const GAME_LABEL: Record<GameMode, string> = {
+  "tug-of-war": "Tug of War",
+  racing: "Math Racing",
+  "boss-battle": "Boss Battle",
+  "bomb-defuse": "Bomb Defuse",
+};
 
 function normalizeQuestion(question: PublicQuestion | null): PublicQuestion | null {
   if (!question) return null;
@@ -62,8 +71,9 @@ export default function PlayerPage() {
   const [session, setSession] = useState<PlayerSession | null>(null);
   const [question, setQuestion] = useState<PublicQuestion | null>(null);
   const [roomStatus, setRoomStatus] = useState("waiting");
+  const [currentGame, setCurrentGame] = useState<GameMode>("tug-of-war");
   const [round, setRound] = useState(0);
-  const [state, setState] = useState<TugState>({ position: 0, target: 10, winner: null });
+  const [state, setState] = useState<ArenaGameState>(createGameState("tug-of-war"));
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -79,6 +89,7 @@ export default function PlayerPage() {
     if (!response.ok) return;
     const data = await response.json();
     setRoomStatus(data.room.status);
+    setCurrentGame(data.room.currentGame);
     setRound(data.room.currentRound);
     if (data.room.gameState) setState(data.room.gameState);
     if (data.question) {
@@ -116,6 +127,7 @@ export default function PlayerPage() {
         const activeSession = sessionRef.current;
         if (!activeSession) return;
         const nextQuestion = normalizeQuestion(payload.questions?.[activeSession.side] ?? null);
+        if (payload.gameMode) setCurrentGame(payload.gameMode);
         setQuestion(nextQuestion);
         setRound(payload.roundNumber ?? 0);
         setRoomStatus("playing");
@@ -125,13 +137,28 @@ export default function PlayerPage() {
         startedAtRef.current = Number(payload.startedAt) || Date.now();
       })
       .on("broadcast", { event: "round-resolved" }, ({ payload }) => {
+        if (payload.gameMode) setCurrentGame(payload.gameMode);
         setState(payload.state);
-        setRoomStatus(payload.matchFinished ? "finished" : "paused");
+        setRoomStatus("paused");
         const ownSide = sessionRef.current?.side;
         if (ownSide && payload.answers?.[ownSide]) {
           const own = payload.answers[ownSide];
           setFeedback(own.correct ? `Benar! +${own.power} power` : "Belum tepat. +0 power");
         }
+      })
+      .on("broadcast", { event: "game-changed" }, ({ payload }) => {
+        setCurrentGame(payload.gameMode);
+        setState(payload.state);
+        setRound(0);
+        setQuestion(null);
+        setSubmitted(false);
+        setFeedback(`${GAME_LABEL[payload.gameMode as GameMode]} siap. Menunggu host.`);
+        setRoomStatus("paused");
+      })
+      .on("broadcast", { event: "session-finished" }, () => {
+        setQuestion(null);
+        setRoomStatus("finished");
+        setFeedback("Sesi Math Arena selesai. Great job!");
       })
       .on("presence", { event: "sync" }, () => setConnection("ONLINE"))
       .subscribe(async (status) => {
@@ -190,30 +217,28 @@ export default function PlayerPage() {
     }
   }, [question, roomStatus, secondsLeft, submitAnswer, submitted]);
 
-  const questionText = question?.questionText ?? "Menunggu host memulai ronde...";
+  const questionText = question?.questionText ?? (roomStatus === "finished" ? "Sesi selesai 🎉" : "Menunggu host memulai ronde...");
   const options = useMemo(() => (Array.isArray(question?.options) ? question.options : []), [question]);
 
-  if (!session) {
-    return <main className="shell"><div className="panel">Memuat sesi pemain...</div></main>;
-  }
+  if (!session) return <main className="shell"><div className="panel">Memuat sesi pemain...</div></main>;
 
   return (
     <main className="shell gameShell">
       <div className="topbar">
         <div>
-          <p className="eyebrow">PLAYER {session.side} · KELAS {session.gradeLevel}</p>
+          <p className="eyebrow">PLAYER {session.side} · KELAS {session.gradeLevel} · {GAME_LABEL[currentGame].toUpperCase()}</p>
           <div className="roomCode">{session.displayName} · ROOM {code}</div>
         </div>
         <div className="status">● {connection}</div>
       </div>
 
-      <TugArena position={state.position} target={state.target} winner={state.winner} />
+      <ArenaVisual mode={currentGame} state={state} />
 
       <section className="questionPanel">
         <div className="questionMeta">
-          <span>Round {round}</span>
+          <span>{GAME_LABEL[currentGame]} · Round {round}</span>
           <span>{question?.difficulty?.toUpperCase() ?? "WAITING"}</span>
-          <span className={secondsLeft <= 10 ? "timer danger" : "timer"}>{secondsLeft}s</span>
+          <span className={secondsLeft <= 10 && roomStatus === "playing" ? "timer danger" : "timer"}>{secondsLeft}s</span>
         </div>
         <h2>{questionText}</h2>
         {question && <p className="muted">{question.topic}{question.subtopic ? ` · ${question.subtopic}` : ""}</p>}
@@ -232,8 +257,8 @@ export default function PlayerPage() {
         </div>
 
         {feedback && <div className="feedbackBox">{feedback}</div>}
-        {roomStatus === "paused" && <p className="muted centerText">Ronde selesai. Menunggu host memulai soal berikutnya.</p>}
-        {state.winner && <div className="winnerBox">Player {state.winner} memenangkan Tug of War!</div>}
+        {roomStatus === "paused" && state.complete && <div className="winnerBox">{GAME_LABEL[currentGame]} selesai. Menunggu host melanjutkan.</div>}
+        {roomStatus === "paused" && !state.complete && <p className="muted centerText">Ronde selesai. Menunggu host memulai soal berikutnya.</p>}
       </section>
     </main>
   );
