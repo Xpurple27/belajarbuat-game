@@ -8,13 +8,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cod
     const supabase = createSupabaseAdmin();
     const { data: room, error: roomError } = await supabase
       .from("arena_rooms")
-      .select("id, code, host_token_hash, status, current_game, current_round, game_state, opponent_mode, ai_difficulty")
+      .select("id, code, host_token_hash, status, current_game, current_round, game_state, opponent_mode, ai_difficulty, round_started_at")
       .eq("code", code)
       .single();
 
-    if (roomError || !room) {
-      return NextResponse.json({ error: "Room tidak ditemukan." }, { status: 404 });
-    }
+    if (roomError || !room) return NextResponse.json({ error: "Room tidak ditemukan." }, { status: 404 });
 
     const hostToken = request.headers.get("x-host-token");
     const playerToken = request.headers.get("x-player-token");
@@ -33,9 +31,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cod
       if (data && data.player_type === "human" && tokenMatches(playerToken, data.player_token_hash)) requestingPlayer = data;
     }
 
-    if (!isHost && !requestingPlayer) {
-      return NextResponse.json({ error: "Sesi tidak valid." }, { status: 401 });
-    }
+    if (!isHost && !requestingPlayer) return NextResponse.json({ error: "Sesi tidak valid." }, { status: 401 });
 
     const { data: players } = await supabase
       .from("arena_players")
@@ -73,6 +69,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cod
         gameState: room.game_state,
         opponentMode: room.opponent_mode,
         aiDifficulty: room.ai_difficulty,
+        roundStartedAt: room.round_started_at,
       },
       players,
       question,
