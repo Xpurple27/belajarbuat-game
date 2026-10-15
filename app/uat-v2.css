@@ -1,0 +1,28 @@
+.tugArenaWrap { position: relative; }
+.tugPlayerNames { position: absolute; z-index: 4; left: 18px; right: 18px; top: 12px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; pointer-events: none; }
+.tugPlayerNames strong { color: #102033; background: rgba(255,255,255,.88); border: 2px solid rgba(16,32,51,.12); padding: 7px 10px; border-radius: 10px; width: fit-content; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-shadow: 0 6px 12px rgba(0,0,0,.12); }
+.tugPlayerNames strong:last-child { justify-self: end; }
+.tugPlayerNames span { color: #fff; background: #111827; border: 2px solid rgba(255,255,255,.24); border-radius: 999px; padding: 5px 8px; font-size: 10px; font-weight: 950; letter-spacing: .08em; }
+.namedLane { grid-template-columns: minmax(70px, 120px) 1fr 54px; }
+.laneLabel.laneName { width: 100%; height: auto; min-height: 32px; padding: 6px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.battleImpact::before { content: ""; position: absolute; inset: 16% 32%; border-radius: 50%; background: radial-gradient(circle, rgba(255,225,98,.5), rgba(255,103,86,.2) 35%, transparent 68%); animation: battlePulse .5s ease-out both; pointer-events: none; }
+.battleStage { position: relative; }
+.bossFlash { animation: bossHitStrong .56s ease both !important; }
+.impactSlash { position: absolute; width: 70%; height: 5px; left: 15%; top: 45%; background: linear-gradient(90deg, transparent, #fff5a4, #ff8f63, transparent); transform-origin: center; filter: drop-shadow(0 0 8px #ffbd6b); border-radius: 999px; animation: slashFlash .45s ease-out both; }
+.slashOne { transform: rotate(30deg); }
+.slashTwo { transform: rotate(-30deg); animation-delay: .06s; }
+@keyframes battlePulse { 0% { opacity: 0; transform: scale(.3); } 45% { opacity: 1; transform: scale(1.12); } 100% { opacity: 0; transform: scale(1.45); } }
+@keyframes bossHitStrong { 0% { transform: translateX(0) scale(1); filter: brightness(1); } 20% { transform: translateX(-12px) rotate(-4deg) scale(.97); filter: brightness(2); } 42% { transform: translateX(10px) rotate(3deg) scale(.95); filter: brightness(1.65) saturate(.7); } 70% { transform: translateX(-4px) rotate(-1deg) scale(1.02); } 100% { transform: translateX(0) scale(1); filter: brightness(1); } }
+@keyframes slashFlash { 0% { opacity: 0; scale: .35 1; } 35% { opacity: 1; scale: 1.1 1; } 100% { opacity: 0; scale: 1.45 1; } }
+.resultHeroGrid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(220px, .55fr); gap: 16px; align-items: stretch; }
+.resultAvatarPanel { border: 1px solid #303b57; border-radius: 16px; background: radial-gradient(circle at 50% 20%, rgba(124,98,255,.22), rgba(11,16,29,.9) 62%); display: grid; place-items: center; min-height: 260px; padding: 20px; }
+.resultAvatarPanel .pixelAvatar { width: min(150px, 56%); }
+.resultActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.resultCardHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.resultCardHeader .eyebrow { margin: 0; }
+@media (max-width: 760px) {
+  .resultHeroGrid { grid-template-columns: 1fr; }
+  .resultAvatarPanel { min-height: 190px; }
+  .namedLane { grid-template-columns: 76px 1fr 42px; }
+  .tugPlayerNames strong { max-width: 120px; font-size: 11px; }
+}
