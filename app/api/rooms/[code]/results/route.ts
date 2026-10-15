@@ -22,16 +22,17 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cod
 
     const { data: players, error: playersError } = await supabase
       .from("arena_players")
-      .select("id, display_name, grade_level, side, player_token_hash")
+      .select("id, display_name, grade_level, side, player_token_hash, player_type, is_host_player")
       .eq("room_id", room.id)
       .order("side");
     if (playersError) throw playersError;
 
-    const requestingPlayer = players?.find((player) => player.id === requestedPlayerId) ?? null;
+    const humanPlayers = (players ?? []).filter((player) => player.player_type === "human");
+    const requestingPlayer = humanPlayers.find((player) => player.id === requestedPlayerId) ?? null;
     const isPlayer = Boolean(requestingPlayer && tokenMatches(playerToken, requestingPlayer.player_token_hash));
     if (!isHost && !isPlayer) return NextResponse.json({ error: "Sesi tidak valid." }, { status: 401 });
 
-    const visiblePlayers = isHost ? (players ?? []) : requestingPlayer ? [requestingPlayer] : [];
+    const visiblePlayers = isHost ? humanPlayers : requestingPlayer ? [requestingPlayer] : [];
     const visibleIds = new Set(visiblePlayers.map((player) => player.id));
 
     const { data: answers, error: answersError } = await supabase
@@ -80,6 +81,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cod
         displayName: player.display_name,
         gradeLevel: player.grade_level,
         side: player.side,
+        isHostPlayer: Boolean(player.is_host_player),
         totalQuestions: playerAnswers.length,
         correct,
         accuracy: playerAnswers.length ? Math.round((correct / playerAnswers.length) * 100) : 0,
