@@ -5,12 +5,14 @@ import PixelAvatar, { type HeroId } from "@/src/components/PixelAvatar";
 export const HERO_OPTIONS: Array<{ id: HeroId; name: string; subtitle: string }> = [
   { id: "nova", name: "Nova", subtitle: "Tech Runner · fokus & cepat" },
   { id: "lyra", name: "Lyra", subtitle: "Puzzle Scout · tenang & presisi" },
+  { id: "kael", name: "Kael", subtitle: "Quantum Vanguard · berani & energik" },
+  { id: "mira", name: "Mira", subtitle: "Logic Adventurer · cermat & lincah" },
 ];
 
 export default function CharacterPicker({ value, onChange }: { value: HeroId; onChange: (hero: HeroId) => void }) {
   return (
     <div className="characterPicker" role="radiogroup" aria-label="Pilih karakter">
-      {HERO_OPTIONS.map((hero, index) => (
+      {HERO_OPTIONS.map((hero) => (
         <button
           key={hero.id}
           type="button"
@@ -20,7 +22,7 @@ export default function CharacterPicker({ value, onChange }: { value: HeroId; on
           onClick={() => onChange(hero.id)}
         >
           <div className="characterPreview">
-            <PixelAvatar characterId={hero.id} side={index === 0 ? "A" : "B"} state="idle" compact />
+            <PixelAvatar characterId={hero.id} side={hero.id === "lyra" || hero.id === "mira" ? "B" : "A"} state="idle" compact />
           </div>
           <div>
             <strong>{hero.name}</strong>

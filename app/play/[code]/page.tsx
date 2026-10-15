@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ArenaVisual from "@/src/components/ArenaVisual";
-import type { HeroId } from "@/src/components/PixelAvatar";
+import { normalizeHeroId, type HeroId } from "@/src/components/PixelAvatar";
 import { supabase } from "@/src/lib/supabase";
 import { playSfx } from "@/src/lib/sfx";
 import {
@@ -115,7 +115,7 @@ export default function PlayerPage() {
     if (!response.ok) return;
     const data = await response.json();
     const next: Record<string, HeroId> = {};
-    for (const item of data.characters ?? []) next[item.id] = item.characterId === "lyra" ? "lyra" : "nova";
+    for (const item of data.characters ?? []) next[item.id] = normalizeHeroId(item.characterId);
     setCharacters(next);
   }, [code]);
 
@@ -204,7 +204,7 @@ export default function PlayerPage() {
         }
       })
       .on("broadcast", { event: "character-changed" }, ({ payload }) => {
-        if (payload.playerId) setCharacters((current) => ({ ...current, [String(payload.playerId)]: payload.characterId === "lyra" ? "lyra" : "nova" }));
+        if (payload.playerId) setCharacters((current) => ({ ...current, [String(payload.playerId)]: normalizeHeroId(payload.characterId) }));
       })
       .on("broadcast", { event: "game-changed" }, ({ payload }) => {
         setCurrentGame(payload.gameMode); setState(payload.state); setRound(0); setQuestion(null);

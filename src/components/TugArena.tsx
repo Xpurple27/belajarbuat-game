@@ -42,7 +42,7 @@ export default function TugArena({position,target=10,winner=null,playerALabel="P
           const centerX=480,ropeShift=-(this.currentPosition/target)*210,flagX=centerX+ropeShift,ropeY=245;
           g.lineStyle(8,0x8a5a32,1);g.lineBetween(195,ropeY,765,ropeY);g.lineStyle(3,0xffffff,.82);g.lineBetween(centerX,145,centerX,310);
           g.fillStyle(0xe43f4f,1);g.fillRect(flagX-6,ropeY-42,12,48);g.fillTriangle(flagX+6,ropeY-42,flagX+52,ropeY-28,flagX+6,ropeY-15);
-          this.pixelPerson(170,310,1,playerACharacter);this.pixelPerson(790,310,-1,playerBCharacter);
+          if(playerACharacter==="nova"||playerACharacter==="lyra")this.pixelPerson(170,310,1,playerACharacter);if(playerBCharacter==="nova"||playerBCharacter==="lyra")this.pixelPerson(790,310,-1,playerBCharacter);
           if(this.currentWinner){g.fillStyle(0x101820,.86);g.fillRoundedRect(310,104,340,88,14);g.fillStyle(0xffdf5d,1);if(this.currentWinner==="A")g.fillRect(268,150,22,22);if(this.currentWinner==="B")g.fillRect(670,150,22,22);if(this.currentWinner==="draw")g.fillRect(469,150,22,22)}
         }
       }
@@ -51,5 +51,10 @@ export default function TugArena({position,target=10,winner=null,playerALabel="P
     void boot();return()=>{cancelled=true;sceneRef.current=null;gameRef.current?.destroy(true);gameRef.current=null};
   },[playerACharacter,playerBCharacter]);
   useEffect(()=>{sceneRef.current?.setMatchState(position,winner)},[position,winner]);
-  return <div className="tugArenaWrap"><div className="tugPlayerNames" aria-hidden="true"><strong>{playerALabel}</strong><span>VS</span><strong>{playerBLabel}</strong></div><div ref={containerRef} className="phaserArena" aria-label={`Tarik tambang ${playerALabel} melawan ${playerBLabel}`}/></div>;
+  return <div className="tugArenaWrap">
+    <div className="tugPlayerNames" aria-hidden="true"><strong>{playerALabel}</strong><span>VS</span><strong>{playerBLabel}</strong></div>
+    {(playerACharacter==="kael"||playerACharacter==="mira") && <img className="tugPremiumHero tugPremiumA" src={playerACharacter==="kael"?"/heroes/kael.webp":"/heroes/mira.webp"} alt={playerALabel} draggable={false}/>}
+    {(playerBCharacter==="kael"||playerBCharacter==="mira") && <img className="tugPremiumHero tugPremiumB" src={playerBCharacter==="kael"?"/heroes/kael.webp":"/heroes/mira.webp"} alt={playerBLabel} draggable={false}/>}
+    <div ref={containerRef} className="phaserArena" aria-label={`Tarik tambang ${playerALabel} melawan ${playerBLabel}`}/>
+  </div>;
 }
