@@ -49,26 +49,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
       .eq("code", code)
       .single();
 
-    if (roomError || !room) {
-      return NextResponse.json({ error: "Room tidak ditemukan." }, { status: 404 });
-    }
-
-    if (!tokenMatches(hostToken, room.host_token_hash)) {
-      return NextResponse.json({ error: "Host token tidak valid." }, { status: 401 });
-    }
-
-    if (room.status === "playing") {
-      return NextResponse.json({ error: "Ronde sebelumnya masih berjalan." }, { status: 409 });
-    }
-
-    if (room.status === "finished") {
-      return NextResponse.json({ error: "Sesi sudah selesai." }, { status: 409 });
-    }
+    if (roomError || !room) return NextResponse.json({ error: "Room tidak ditemukan." }, { status: 404 });
+    if (!tokenMatches(hostToken, room.host_token_hash)) return NextResponse.json({ error: "Host token tidak valid." }, { status: 401 });
+    if (room.status === "playing") return NextResponse.json({ error: "Ronde sebelumnya masih berjalan." }, { status: 409 });
+    if (room.status === "finished") return NextResponse.json({ error: "Sesi sudah selesai." }, { status: 409 });
 
     const currentState = room.game_state as { complete?: boolean } | null;
-    if (currentState?.complete) {
-      return NextResponse.json({ error: "Game ini sudah selesai. Lanjutkan ke game berikutnya." }, { status: 409 });
-    }
+    if (currentState?.complete) return NextResponse.json({ error: "Game ini sudah selesai. Lanjutkan ke game berikutnya." }, { status: 409 });
 
     const gameMode = room.current_game as GameMode;
     const { data: players, error: playersError } = await supabase
@@ -78,14 +65,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
       .order("side");
 
     if (playersError) throw playersError;
-    if (!players || players.length !== 2) {
-      return NextResponse.json({ error: "Arena membutuhkan dua slot pemain: dua manusia atau satu manusia + CPU." }, { status: 409 });
-    }
-
-    const humanCount = players.filter((player) => player.player_type === "human").length;
-    if (humanCount < 1) {
-      return NextResponse.json({ error: "Arena membutuhkan setidaknya satu pemain manusia." }, { status: 409 });
-    }
+    if (!players || players.length !== 2) return NextResponse.json({ error: "Arena membutuhkan dua slot pemain: dua manusia atau satu manusia + CPU." }, { status: 409 });
+    if (players.filter((player) => player.player_type === "human").length < 1) return NextResponse.json({ error: "Arena membutuhkan setidaknya satu pemain manusia." }, { status: 409 });
 
     const roundNumber = room.current_round + 1;
     const difficulty = DIFFICULTY_CYCLE[(roundNumber - 1) % DIFFICULTY_CYCLE.length];
@@ -102,10 +83,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
 
       if (questionError) throw questionError;
       if (!candidates?.length) {
-        return NextResponse.json(
-          { error: `Belum ada soal ${difficulty} untuk kelas ${player.grade_level}. Tambahkan soal ke arena_questions.` },
-          { status: 409 },
-        );
+        return NextResponse.json({ error: `Belum ada soal ${difficulty} untuk kelas ${player.grade_level}. Tambahkan soal ke arena_questions.` }, { status: 409 });
       }
 
       const { data: usedAssignments } = await supabase
@@ -128,15 +106,20 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
         round_number: roundNumber,
       });
       if (assignmentError) throw assignmentError;
-
       questionsBySide[player.side] = publicQuestion(selected);
     }
 
+    const roundStartedAt = new Date().toISOString();
     const { data: updatedRoom, error: updateError } = await supabase
       .from("arena_rooms")
-      .update({ status: "playing", current_round: roundNumber, updated_at: new Date().toISOString() })
+      .update({
+        status: "playing",
+        current_round: roundNumber,
+        round_started_at: roundStartedAt,
+        updated_at: roundStartedAt,
+      })
       .eq("id", room.id)
-      .select("code, status, current_game, current_round, game_state, opponent_mode, ai_difficulty")
+      .select("code, status, current_game, current_round, game_state, opponent_mode, ai_difficulty, round_started_at")
       .single();
 
     if (updateError) throw updateError;
@@ -148,7 +131,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
       difficulty,
       questions: questionsBySide,
       durationSeconds: ROUND_DURATION_SECONDS,
-      startedAt: Date.now(),
+      startedAt: new Date(roundStartedAt).getTime(),
     };
 
     await broadcastRoomEvent(code, "round-start", payload);
