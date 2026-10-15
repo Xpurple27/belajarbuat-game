@@ -1,5 +1,8 @@
 "use client";
 
+import { NOVA_HERO_SRC } from "@/src/lib/heroData/nova";
+import { LYRA_HERO_SRC } from "@/src/lib/heroData/lyra";
+
 export type HeroId = "nova" | "lyra" | "kael" | "mira";
 export const HERO_IDS: HeroId[] = ["nova", "lyra", "kael", "mira"];
 
@@ -17,11 +20,17 @@ interface PixelAvatarProps {
   characterId?: HeroId;
 }
 
-export const HERO_ART: Record<HeroId, { name: string; src: string }> = {
-  nova: { name: "Nova", src: "/heroes/nova.webp" },
-  lyra: { name: "Lyra", src: "/heroes/lyra.webp" },
-  kael: { name: "Kael", src: "/heroes/kael.webp" },
-  mira: { name: "Mira", src: "/heroes/mira.webp" },
+/**
+ * Hero asset registry.
+ * Nova/Lyra are embedded as validated WebP data URIs so they can never be
+ * corrupted by a text-mode deployment. Kael/Mira are real binary WebP blobs
+ * under /public/heroes and are validated during the V3 rollout.
+ */
+export const HERO_ART: Record<HeroId, { name: string; src: string; accent: string }> = {
+  nova: { name: "Nova", src: NOVA_HERO_SRC, accent: "#36c8ff" },
+  lyra: { name: "Lyra", src: LYRA_HERO_SRC, accent: "#d77cff" },
+  kael: { name: "Kael", src: "/heroes/kael.webp?v=3", accent: "#ffbe45" },
+  mira: { name: "Mira", src: "/heroes/mira.webp?v=3", accent: "#ff6cab" },
 };
 
 export default function PixelAvatar({
@@ -39,12 +48,14 @@ export default function PixelAvatar({
       aria-label={`${label ?? hero.name} · ${state}`}
       data-hero={characterId}
       data-state={state}
+      style={{ "--hero-accent": hero.accent } as React.CSSProperties}
     >
       <img
         className={`premiumHeroImage premiumSide-${side}`}
         src={hero.src}
         alt={label ?? hero.name}
         draggable={false}
+        decoding="async"
       />
       {label && <span>{label}</span>}
     </div>
