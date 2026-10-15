@@ -1,60 +1,93 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function JoinPage() {
-  const [joined, setJoined] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [roomCode, setRoomCode] = useState(searchParams.get("room") ?? "");
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("4");
-  const [room, setRoom] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function joinRoom(event: FormEvent) {
     event.preventDefault();
-    if (!name.trim() || room.trim().length < 4) return;
-    setJoined(true);
+    setError("");
+    const code = roomCode.replace(/\D/g, "").slice(0, 6);
+    if (code.length !== 6 || !name.trim()) {
+      setError("Isi kode room 6 digit dan nama pemain.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/rooms/${code}/join`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ displayName: name.trim(), gradeLevel: Number(grade) }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Gagal masuk room.");
+
+      sessionStorage.setItem(
+        `arena-player-${code}`,
+        JSON.stringify({
+          id: data.player.id,
+          token: data.playerToken,
+          side: data.player.side,
+          displayName: data.player.display_name,
+          gradeLevel: data.player.grade_level,
+        }),
+      );
+      router.push(`/play/${code}`);
+    } catch (joinError) {
+      setError(joinError instanceof Error ? joinError.message : "Gagal masuk room.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <main className="shell" style={{ maxWidth: 620 }}>
-      <p className="eyebrow">PLAYER JOIN</p>
-      <h1 style={{ fontSize: "clamp(38px, 8vw, 64px)" }}>Masuk ke Math Arena</h1>
+    <main className="shell narrowShell">
+      <section className="panel joinPanel">
+        <p className="eyebrow">LEVELUP MATH ARENA</p>
+        <h1>Join Room</h1>
+        <p className="muted">Masukkan kode dari host. Tidak perlu membuat akun untuk MVP.</p>
 
-      {!joined ? (
-        <form className="panel" onSubmit={submit}>
+        <form onSubmit={joinRoom} className="stack">
           <label className="field">
             <span>Kode room</span>
             <input
               inputMode="numeric"
-              maxLength={6}
+              value={roomCode}
+              onChange={(event) => setRoomCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
               placeholder="527941"
-              value={room}
-              onChange={(event) => setRoom(event.target.value.replace(/\D/g, ""))}
+              maxLength={6}
             />
           </label>
+
           <label className="field">
             <span>Nama pemain</span>
-            <input maxLength={24} value={name} onChange={(event) => setName(event.target.value)} placeholder="Nama panggilan" />
+            <input value={name} onChange={(event) => setName(event.target.value)} maxLength={24} placeholder="Nama" />
           </label>
+
           <label className="field">
             <span>Kelas</span>
             <select value={grade} onChange={(event) => setGrade(event.target.value)}>
-              <option value="4">Kelas 4 SD</option>
-              <option value="7">Kelas 7 SMP</option>
+              {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => (
+                <option key={value} value={value}>Kelas {value}</option>
+              ))}
             </select>
           </label>
-          <button className="button primary" style={{ width: "100%" }} type="submit">JOIN ROOM</button>
+
+          {error && <div className="errorBox">{error}</div>}
+          <button className="button" disabled={loading} type="submit">
+            {loading ? "Masuk..." : "Masuk Arena"}
+          </button>
         </form>
-      ) : (
-        <section className="panel">
-          <div className="status">● Terhubung ke prototype room {room}</div>
-          <h2 style={{ marginTop: 22 }}>{name}</h2>
-          <p className="muted">Kelas {grade} · menunggu host memulai permainan.</p>
-          <div className="arena" style={{ minHeight: 220, marginTop: 20 }}>
-            <div className="pixelCharacter a">🧒</div>
-            <div className="track" />
-          </div>
-        </section>
-      )}
+      </section>
     </main>
   );
 }
