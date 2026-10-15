@@ -3,8 +3,8 @@
 import PixelAvatar, { type HeroId } from "@/src/components/PixelAvatar";
 
 export const HERO_OPTIONS: Array<{ id: HeroId; name: string; subtitle: string }> = [
-  { id: "nova", name: "Nova", subtitle: "Tech Runner · fokus & cepat" },
-  { id: "lyra", name: "Lyra", subtitle: "Puzzle Scout · tenang & presisi" },
+  { id: "nova", name: "Nova", subtitle: "Star Navigator · cepat & strategis" },
+  { id: "lyra", name: "Lyra", subtitle: "Celestial Scholar · tenang & cermat" },
   { id: "kael", name: "Kael", subtitle: "Quantum Vanguard · berani & energik" },
   { id: "mira", name: "Mira", subtitle: "Logic Adventurer · cermat & lincah" },
 ];
