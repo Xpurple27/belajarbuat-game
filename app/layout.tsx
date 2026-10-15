@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./uat-v2.css";
+import "./arena-v2.css";
 
 export const metadata: Metadata = {
   title: "LevelUP Math Arena",
