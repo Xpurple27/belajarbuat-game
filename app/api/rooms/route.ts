@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/src/lib/supabase-server";
 import { createOpaqueToken, hashToken } from "@/src/lib/tokens";
+import { createGameState } from "@/src/core/game";
 
 function randomRoomCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -21,7 +22,7 @@ export async function POST() {
           status: "waiting",
           current_game: "tug-of-war",
           current_round: 0,
-          game_state: { position: 0, target: 10, winner: null },
+          game_state: createGameState("tug-of-war"),
         })
         .select("id, code, status, current_game, current_round, game_state")
         .single();
@@ -30,9 +31,7 @@ export async function POST() {
         return NextResponse.json({ room: data, hostToken });
       }
 
-      if (error?.code !== "23505") {
-        throw error;
-      }
+      if (error?.code !== "23505") throw error;
     }
 
     return NextResponse.json({ error: "Gagal membuat kode room unik." }, { status: 503 });
