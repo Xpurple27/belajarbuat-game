@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const SUPPORTED_GRADES = [4, 7];
+
 export default function JoinPage() {
   const router = useRouter();
   const [roomCode, setRoomCode] = useState("");
@@ -55,10 +57,12 @@ export default function JoinPage() {
 
   return (
     <main className="shell narrowShell">
-      <section className="panel joinPanel">
-        <p className="eyebrow">LEVELUP MATH ARENA</p>
-        <h1>Join Room</h1>
-        <p className="muted">Masukkan kode dari host. Tidak perlu membuat akun untuk MVP.</p>
+      <section className="setupCard">
+        <div className="setupHeader">
+          <p className="eyebrow">LEVELUP MATH ARENA</p>
+          <h1>Join Arena</h1>
+          <p className="muted">Masukkan kode dari host. Tidak perlu akun—cukup nama, kelas, lalu bermain dari perangkatmu sendiri.</p>
+        </div>
 
         <form onSubmit={joinRoom} className="stack">
           <label className="field">
@@ -69,27 +73,25 @@ export default function JoinPage() {
               onChange={(event) => setRoomCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
               placeholder="527941"
               maxLength={6}
+              autoComplete="off"
             />
           </label>
 
           <label className="field">
             <span>Nama pemain</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} maxLength={24} placeholder="Nama" />
+            <input value={name} onChange={(event) => setName(event.target.value)} maxLength={24} placeholder="Nama / nickname" autoComplete="off" />
           </label>
 
           <label className="field">
             <span>Kelas</span>
             <select value={grade} onChange={(event) => setGrade(event.target.value)}>
-              {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => (
-                <option key={value} value={value}>Kelas {value}</option>
-              ))}
+              {SUPPORTED_GRADES.map((value) => <option key={value} value={value}>Kelas {value}</option>)}
             </select>
           </label>
 
+          <div className="noticeBox">Bank soal V1 aktif untuk kelas 4 SD dan kelas 7 SMP. Sistem database sudah siap diperluas ke kelas 1–12.</div>
           {error && <div className="errorBox">{error}</div>}
-          <button className="button" disabled={loading} type="submit">
-            {loading ? "Masuk..." : "Masuk Arena"}
-          </button>
+          <button className="button primary full" disabled={loading} type="submit">{loading ? "Masuk ke arena..." : "Masuk Arena"}</button>
         </form>
       </section>
     </main>
