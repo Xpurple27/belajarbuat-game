@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/src/lib/supabase-server";
 import { tokenMatches } from "@/src/lib/tokens";
 import { broadcastRoomEvent } from "@/src/lib/realtime-server";
-import type { Difficulty } from "@/src/core/game";
+import type { Difficulty, GameMode } from "@/src/core/game";
 
 const DIFFICULTY_CYCLE: Difficulty[] = ["easy", "medium", "medium", "hard"];
 
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
 
     const { data: room, error: roomError } = await supabase
       .from("arena_rooms")
-      .select("id, code, host_token_hash, status, current_round, game_state")
+      .select("id, code, host_token_hash, status, current_game, current_round, game_state")
       .eq("code", code)
       .single();
 
@@ -57,9 +57,15 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
     }
 
     if (room.status === "finished") {
-      return NextResponse.json({ error: "Match sudah selesai." }, { status: 409 });
+      return NextResponse.json({ error: "Sesi sudah selesai." }, { status: 409 });
     }
 
+    const currentState = room.game_state as { complete?: boolean } | null;
+    if (currentState?.complete) {
+      return NextResponse.json({ error: "Game ini sudah selesai. Lanjutkan ke game berikutnya." }, { status: 409 });
+    }
+
+    const gameMode = room.current_game as GameMode;
     const { data: players, error: playersError } = await supabase
       .from("arena_players")
       .select("id, display_name, grade_level, side")
@@ -96,7 +102,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
         .from("arena_round_assignments")
         .select("question_id")
         .eq("room_id", room.id)
-        .eq("player_id", player.id);
+        .eq("player_id", player.id)
+        .eq("game_mode", gameMode);
 
       const used = new Set((usedAssignments ?? []).map((row) => row.question_id));
       const unused = candidates.filter((question) => !used.has(question.id));
@@ -107,7 +114,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
         room_id: room.id,
         player_id: player.id,
         question_id: selected.id,
-        game_mode: "tug-of-war",
+        game_mode: gameMode,
         round_number: roundNumber,
       });
       if (assignmentError) throw assignmentError;
@@ -126,6 +133,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
 
     const payload = {
       room: updatedRoom,
+      gameMode,
       roundNumber,
       difficulty,
       questions: questionsBySide,
