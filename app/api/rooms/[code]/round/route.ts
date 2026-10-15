@@ -5,6 +5,7 @@ import { broadcastRoomEvent } from "@/src/lib/realtime-server";
 import type { Difficulty, GameMode } from "@/src/core/game";
 
 const DIFFICULTY_CYCLE: Difficulty[] = ["easy", "medium", "medium", "hard"];
+const ROUND_DURATION_SECONDS = 60;
 
 type QuestionRow = {
   id: string;
@@ -31,7 +32,7 @@ function publicQuestion(question: QuestionRow) {
     questionText: question.question_text,
     questionImageUrl: question.question_image_url,
     options: question.options,
-    estimatedTimeSeconds: question.estimated_time_seconds,
+    estimatedTimeSeconds: ROUND_DURATION_SECONDS,
     powerValue: question.power_value,
   };
 }
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
 
     const { data: room, error: roomError } = await supabase
       .from("arena_rooms")
-      .select("id, code, host_token_hash, status, current_game, current_round, game_state")
+      .select("id, code, host_token_hash, status, current_game, current_round, game_state, opponent_mode, ai_difficulty")
       .eq("code", code)
       .single();
 
@@ -54,6 +55,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
 
     if (!tokenMatches(hostToken, room.host_token_hash)) {
       return NextResponse.json({ error: "Host token tidak valid." }, { status: 401 });
+    }
+
+    if (room.status === "playing") {
+      return NextResponse.json({ error: "Ronde sebelumnya masih berjalan." }, { status: 409 });
     }
 
     if (room.status === "finished") {
@@ -68,13 +73,18 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
     const gameMode = room.current_game as GameMode;
     const { data: players, error: playersError } = await supabase
       .from("arena_players")
-      .select("id, display_name, grade_level, side")
+      .select("id, display_name, grade_level, side, player_type")
       .eq("room_id", room.id)
       .order("side");
 
     if (playersError) throw playersError;
     if (!players || players.length !== 2) {
-      return NextResponse.json({ error: "Dua pemain harus sudah bergabung." }, { status: 409 });
+      return NextResponse.json({ error: "Arena membutuhkan dua slot pemain: dua manusia atau satu manusia + CPU." }, { status: 409 });
+    }
+
+    const humanCount = players.filter((player) => player.player_type === "human").length;
+    if (humanCount < 1) {
+      return NextResponse.json({ error: "Arena membutuhkan setidaknya satu pemain manusia." }, { status: 409 });
     }
 
     const roundNumber = room.current_round + 1;
@@ -88,12 +98,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
         .eq("grade_level", player.grade_level)
         .eq("difficulty", difficulty)
         .eq("is_active", true)
-        .limit(30);
+        .limit(40);
 
       if (questionError) throw questionError;
       if (!candidates?.length) {
         return NextResponse.json(
-          { error: `Belum ada soal ${difficulty} untuk kelas ${player.grade_level}.` },
+          { error: `Belum ada soal ${difficulty} untuk kelas ${player.grade_level}. Tambahkan soal ke arena_questions.` },
           { status: 409 },
         );
       }
@@ -126,7 +136,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
       .from("arena_rooms")
       .update({ status: "playing", current_round: roundNumber, updated_at: new Date().toISOString() })
       .eq("id", room.id)
-      .select("code, status, current_game, current_round, game_state")
+      .select("code, status, current_game, current_round, game_state, opponent_mode, ai_difficulty")
       .single();
 
     if (updateError) throw updateError;
@@ -137,6 +147,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
       roundNumber,
       difficulty,
       questions: questionsBySide,
+      durationSeconds: ROUND_DURATION_SECONDS,
       startedAt: Date.now(),
     };
 
